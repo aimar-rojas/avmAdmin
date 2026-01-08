@@ -104,6 +104,7 @@ Desktop.ini
 
 # Kotlin
 *.kotlin_module
+.Kotlin/
 
 # Kapt
 .kapt/
