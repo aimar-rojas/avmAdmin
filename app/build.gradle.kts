@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.kapt)
+    id("org.jetbrains.kotlin.plugin.parcelize")
 }
 
 android {
@@ -29,10 +30,12 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             resValue("string", "app_name", "AVM Admin Dev")
+            buildConfigField("String", "BASE_URL", "\"http://192.168.1.8:5001/api/\"")
         }
         create("prod") {
             dimension = "environment"
             resValue("string", "app_name", "AVM Admin")
+            buildConfigField("String", "BASE_URL", "\"http://192.168.1.8:5001/api/\"")
         }
     }
 
@@ -57,6 +60,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -89,6 +93,13 @@ dependencies {
     
     // Hilt Navigation Compose
     implementation(libs.hilt.navigation.compose)
+    
+    // Networking
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+    implementation(libs.gson)
     
     // Testing
     testImplementation(libs.junit)
