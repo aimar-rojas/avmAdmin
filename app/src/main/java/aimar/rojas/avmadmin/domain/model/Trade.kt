@@ -21,5 +21,7 @@ data class Trade(
     @SerializedName("end_datetime")
     val endDatetime: String,
     @SerializedName("discount_weight_per_tray")
-    val discountWeightPerTray: Double
+    val discountWeightPerTray: Double,
+    @SerializedName("amount_per_trade")
+    val amountPerTrade: Double
 ) : Parcelable

@@ -13,5 +13,7 @@ data class Shipment(
     val startDate: Date,
     @SerializedName("end_date")
     val endDate: Date? = null,
-    val status: String
+    val status: String,
+    @SerializedName("amount_per_shipment")
+    val amountPerShipment: Double
 ) : Parcelable
