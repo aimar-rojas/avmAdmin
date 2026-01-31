@@ -103,6 +103,9 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.gson)
     
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
+    
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

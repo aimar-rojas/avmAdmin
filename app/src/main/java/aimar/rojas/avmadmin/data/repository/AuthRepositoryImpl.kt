@@ -1,7 +1,7 @@
 package aimar.rojas.avmadmin.data.repository
 
-import aimar.rojas.avmadmin.core.auth.TokenManager
-import aimar.rojas.avmadmin.data.local.SessionStore
+import aimar.rojas.avmadmin.core.auth.TokenDataStore
+import aimar.rojas.avmadmin.data.local.SessionDataStore
 import aimar.rojas.avmadmin.data.remote.api.AuthApiService
 import aimar.rojas.avmadmin.data.remote.mapper.toDomain
 import aimar.rojas.avmadmin.domain.model.AuthResponse
@@ -9,14 +9,15 @@ import aimar.rojas.avmadmin.domain.model.RegisterResponse
 import aimar.rojas.avmadmin.domain.repository.AuthRepository
 import aimar.rojas.avmadmin.features.login.data.LoginRequest
 import aimar.rojas.avmadmin.features.register.data.RegisterRequest
+import kotlinx.coroutines.runBlocking
 import retrofit2.HttpException
 import java.io.IOException
 import javax.inject.Inject
 
 class AuthRepositoryImpl @Inject constructor(
     private val authApiService: AuthApiService,
-    private val tokenManager: TokenManager,
-    private val sessionStore: SessionStore
+    private val tokenDataStore: TokenDataStore,
+    private val sessionDataStore: SessionDataStore
 ) : AuthRepository {
 
     override suspend fun login(email: String, password: String): Result<AuthResponse> {
@@ -29,9 +30,9 @@ class AuthRepositoryImpl @Inject constructor(
                 // Convertir DTO a modelo de dominio
                 val authResponse = authResponseDto.toDomain()
                 // Guardar token, usuario y estado de perfil
-                tokenManager.saveToken(authResponse.token)
-                sessionStore.saveUser(authResponse.user)
-                sessionStore.saveIsCompletedProfile(authResponse.isCompletedProfile)
+                tokenDataStore.saveToken(authResponse.token)
+                sessionDataStore.saveUser(authResponse.user)
+                sessionDataStore.saveIsCompletedProfile(authResponse.isCompletedProfile)
                 Result.success(authResponse)
             } else {
                 val errorMessage = response.errorBody()?.string() ?: "Error desconocido"
@@ -78,14 +79,20 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override fun logout() {
-        sessionStore.clearSession()
+        runBlocking {
+            sessionDataStore.clearSession()
+        }
     }
 
     override fun isLoggedIn(): Boolean {
-        return tokenManager.isLoggedIn()
+        return runBlocking {
+            sessionDataStore.isLoggedIn()
+        }
     }
 
     override fun getCurrentToken(): String? {
-        return tokenManager.getToken()
+        return runBlocking {
+            sessionDataStore.getToken()
+        }
     }
 }
