@@ -30,12 +30,13 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             resValue("string", "app_name", "AVM Admin Dev")
-            buildConfigField("String", "BASE_URL", "\"http://192.168.1.8:5001/api/\"")
+//            buildConfigField("String", "BASE_URL", "\"http://192.168.1.8:5001/api/\"")
+            buildConfigField("String", "BASE_URL", "\"https://backavmgin-production.up.railway.app/api/\"")
         }
         create("prod") {
             dimension = "environment"
             resValue("string", "app_name", "AVM Admin")
-            buildConfigField("String", "BASE_URL", "\"http://192.168.1.8:5001/api/\"")
+            buildConfigField("String", "BASE_URL", "\"https://backavmgin-production.up.railway.app/api/\"")
         }
     }
 
@@ -89,6 +90,7 @@ dependencies {
     
     // Dagger Hilt
     implementation(libs.hilt.android)
+    implementation(libs.androidbrowserhelper)
     kapt(libs.hilt.android.compiler)
     
     // Hilt Navigation Compose
