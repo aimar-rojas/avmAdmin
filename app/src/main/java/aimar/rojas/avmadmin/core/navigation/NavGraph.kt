@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import aimar.rojas.avmadmin.features.home.presentation.HomeScreen
 import aimar.rojas.avmadmin.features.login.presentation.LoginScreen
 import aimar.rojas.avmadmin.features.register.presentation.RegisterScreen
+import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsScreen
 
 @Composable
 fun NavGraph(
@@ -27,6 +28,10 @@ fun NavGraph(
         
         composable("home") {
             HomeScreen(navController = navController)
+        }
+        
+        composable("shipments") {
+            ShipmentsScreen(navController = navController)
         }
     }
 }
