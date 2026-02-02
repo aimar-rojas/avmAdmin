@@ -123,7 +123,13 @@ fun ShipmentsScreen(
                 onStartDateChange = { viewModel.onCreateStartDateChange(it) },
                 onEndDateChange = { viewModel.onCreateEndDateChange(it) },
                 onStatusChange = { viewModel.onCreateStatusChange(it) },
-                onCreate = { viewModel.createShipment() }
+                onCreate = { viewModel.createShipment() },
+                onStartDateSelected = { viewModel.onStartDateSelected(it) },
+                onEndDateSelected = { viewModel.onEndDateSelected(it) },
+                onShowStartDatePicker = { viewModel.showStartDatePicker() },
+                onHideStartDatePicker = { viewModel.hideStartDatePicker() },
+                onShowEndDatePicker = { viewModel.showEndDatePicker() },
+                onHideEndDatePicker = { viewModel.hideEndDatePicker() }
             )
         }
 

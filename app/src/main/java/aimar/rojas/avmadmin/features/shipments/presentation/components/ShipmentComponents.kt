@@ -1,15 +1,43 @@
 package aimar.rojas.avmadmin.features.shipments.presentation.components
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import aimar.rojas.avmadmin.domain.model.Shipment
+import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsUiState
+import aimar.rojas.avmadmin.utils.DateUtils
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import aimar.rojas.avmadmin.domain.model.Shipment
-import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsUiState
-import aimar.rojas.avmadmin.utils.DateUtils
+import java.util.Date
 
 @Composable
 fun ShipmentCard(shipment: Shipment) {
@@ -75,6 +103,7 @@ fun ShipmentCard(shipment: Shipment) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateShipmentDialog(
     uiState: ShipmentsUiState,
@@ -82,8 +111,76 @@ fun CreateShipmentDialog(
     onStartDateChange: (String) -> Unit,
     onEndDateChange: (String) -> Unit,
     onStatusChange: (String) -> Unit,
-    onCreate: () -> Unit
+    onCreate: () -> Unit,
+    onStartDateSelected: (Date) -> Unit,
+    onEndDateSelected: (Date) -> Unit,
+    onShowStartDatePicker: () -> Unit,
+    onHideStartDatePicker: () -> Unit,
+    onShowEndDatePicker: () -> Unit,
+    onHideEndDatePicker: () -> Unit
 ) {
+    val startDatePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = uiState.createStartDate.takeIf { it.isNotBlank() }
+            ?.let { DateUtils.parseApiDate(it)?.time }
+            ?: System.currentTimeMillis()
+    )
+
+    val endDatePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = uiState.createEndDate.takeIf { it.isNotBlank() }
+            ?.let { DateUtils.parseApiDate(it)?.time }
+            ?: System.currentTimeMillis()
+    )
+
+    if (uiState.showStartDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = onHideStartDatePicker,
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        startDatePickerState.selectedDateMillis?.let { millis ->
+                            val date = Date(millis)
+                            onStartDateSelected(date)
+                        }
+                    }
+                ) {
+                    Text("Seleccionar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onHideStartDatePicker) {
+                    Text("Cancelar")
+                }
+            }
+        ) {
+            DatePicker(state = startDatePickerState)
+        }
+    }
+
+    if (uiState.showEndDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = onHideEndDatePicker,
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        endDatePickerState.selectedDateMillis?.let { millis ->
+                            val date = Date(millis)
+                            onEndDateSelected(date)
+                        }
+                    }
+                ) {
+                    Text("Seleccionar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onHideEndDatePicker) {
+                    Text("Cancelar")
+                }
+            }
+        ) {
+            DatePicker(state = endDatePickerState)
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -96,28 +193,10 @@ fun CreateShipmentDialog(
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedTextField(
-                    value = uiState.createStartDate,
-                    onValueChange = onStartDateChange,
-                    label = { Text("Fecha de inicio (YYYY-MM-DD)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-                
-                OutlinedTextField(
-                    value = uiState.createEndDate,
-                    onValueChange = onEndDateChange,
-                    label = { Text("Fecha de fin (YYYY-MM-DD) - Opcional") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                    )
+                Text(
+                    text = "Tipo de envío",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 
                 Row(
@@ -127,15 +206,73 @@ fun CreateShipmentDialog(
                     FilterChip(
                         selected = uiState.createStatus == "OPEN",
                         onClick = { onStatusChange("OPEN") },
-                        label = { Text("OPEN") },
+                        label = { Text("Nuevo") },
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
                         selected = uiState.createStatus == "CLOSED",
                         onClick = { onStatusChange("CLOSED") },
-                        label = { Text("CLOSED") },
+                        label = { Text("Pasado") },
                         modifier = Modifier.weight(1f)
                     )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = uiState.createStartDate,
+                        onValueChange = onStartDateChange,
+                        label = { Text("Fecha de inicio (YYYY-MM-DD)") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                    IconButton(
+                        onClick = onShowStartDatePicker,
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CalendarToday,
+                            contentDescription = "Seleccionar fecha de inicio"
+                        )
+                    }
+                }
+                
+                if (uiState.createStatus == "CLOSED") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.createEndDate,
+                            onValueChange = onEndDateChange,
+                            label = { Text("Fecha de fin (YYYY-MM-DD)") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        IconButton(
+                            onClick = onShowEndDatePicker,
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CalendarToday,
+                                contentDescription = "Seleccionar fecha de fin"
+                            )
+                        }
+                    }
                 }
                 
                 if (uiState.error != null) {

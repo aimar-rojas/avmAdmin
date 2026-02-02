@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import aimar.rojas.avmadmin.domain.model.Shipment
 import aimar.rojas.avmadmin.features.shipments.domain.ShipmentsRepository
+import aimar.rojas.avmadmin.utils.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Date
 import javax.inject.Inject
 
 @HiltViewModel
@@ -52,7 +54,9 @@ class ShipmentsViewModel @Inject constructor(
             showCreateDialog = true,
             createStartDate = "",
             createEndDate = "",
-            createStatus = "OPEN"
+            createStatus = "OPEN",
+            showStartDatePicker = false,
+            showEndDatePicker = false
         )
     }
 
@@ -68,8 +72,41 @@ class ShipmentsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(createEndDate = date)
     }
 
+    fun onStartDateSelected(date: Date) {
+        _uiState.value = _uiState.value.copy(
+            createStartDate = DateUtils.formatToApiDate(date),
+            showStartDatePicker = false
+        )
+    }
+
+    fun onEndDateSelected(date: Date) {
+        _uiState.value = _uiState.value.copy(
+            createEndDate = DateUtils.formatToApiDate(date),
+            showEndDatePicker = false
+        )
+    }
+
+    fun showStartDatePicker() {
+        _uiState.value = _uiState.value.copy(showStartDatePicker = true)
+    }
+
+    fun hideStartDatePicker() {
+        _uiState.value = _uiState.value.copy(showStartDatePicker = false)
+    }
+
+    fun showEndDatePicker() {
+        _uiState.value = _uiState.value.copy(showEndDatePicker = true)
+    }
+
+    fun hideEndDatePicker() {
+        _uiState.value = _uiState.value.copy(showEndDatePicker = false)
+    }
+
     fun onCreateStatusChange(status: String) {
-        _uiState.value = _uiState.value.copy(createStatus = status)
+        _uiState.value = _uiState.value.copy(
+            createStatus = status,
+            createEndDate = if (status == "OPEN") "" else _uiState.value.createEndDate
+        )
     }
 
     fun createShipment() {
@@ -80,8 +117,13 @@ class ShipmentsViewModel @Inject constructor(
             return
         }
         
+        if (currentState.createStatus == "CLOSED" && currentState.createEndDate.isBlank()) {
+            _uiState.value = currentState.copy(error = "La fecha de fin es requerida para envíos pasados")
+            return
+        }
+        
         if (currentState.createStatus !in listOf("OPEN", "CLOSED")) {
-            _uiState.value = currentState.copy(error = "El estado debe ser OPEN o CLOSED")
+            _uiState.value = currentState.copy(error = "El estado debe ser Nuevo (OPEN) o Pasado (CLOSED)")
             return
         }
 
@@ -128,5 +170,7 @@ data class ShipmentsUiState(
     val showCreateDialog: Boolean = false,
     val createStartDate: String = "",
     val createEndDate: String = "",
-    val createStatus: String = "OPEN"
+    val createStatus: String = "OPEN",
+    val showStartDatePicker: Boolean = false,
+    val showEndDatePicker: Boolean = false
 )
