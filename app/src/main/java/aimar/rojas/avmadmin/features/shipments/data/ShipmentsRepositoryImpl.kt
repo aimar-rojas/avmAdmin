@@ -1,8 +1,5 @@
 package aimar.rojas.avmadmin.features.shipments.data
 
-import aimar.rojas.avmadmin.data.remote.dto.CreateShipmentRequest
-import aimar.rojas.avmadmin.data.remote.dto.UpdateShipmentRequest
-import aimar.rojas.avmadmin.data.remote.mapper.toDomain
 import aimar.rojas.avmadmin.domain.model.Shipment
 import aimar.rojas.avmadmin.features.shipments.domain.ShipmentsRepository
 import aimar.rojas.avmadmin.features.shipments.domain.ShipmentsResult

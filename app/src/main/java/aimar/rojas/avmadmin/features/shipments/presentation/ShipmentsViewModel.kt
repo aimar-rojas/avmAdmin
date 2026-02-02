@@ -2,7 +2,6 @@ package aimar.rojas.avmadmin.features.shipments.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import aimar.rojas.avmadmin.data.remote.mapper.toApiFormat
 import aimar.rojas.avmadmin.domain.model.Shipment
 import aimar.rojas.avmadmin.features.shipments.domain.ShipmentsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel

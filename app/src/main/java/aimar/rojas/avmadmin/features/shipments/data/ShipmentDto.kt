@@ -1,4 +1,4 @@
-package aimar.rojas.avmadmin.data.remote.dto
+package aimar.rojas.avmadmin.features.shipments.data
 
 import com.google.gson.annotations.SerializedName
 

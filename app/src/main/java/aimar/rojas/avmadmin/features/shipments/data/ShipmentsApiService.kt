@@ -1,6 +1,5 @@
 package aimar.rojas.avmadmin.features.shipments.data
 
-import aimar.rojas.avmadmin.data.remote.dto.*
 import retrofit2.Response
 import retrofit2.http.*
 
