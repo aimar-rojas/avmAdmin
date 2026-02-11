@@ -111,3 +111,7 @@ Desktop.ini
 
 # Hilt
 app/build/generated/source/kapt/
+
+# Documentation
+app/src/main/java/aimar/rojas/avmadmin/documentationAndroid/
+app/src/main/java/aimar/rojas/avmadmin/documentationBackend/

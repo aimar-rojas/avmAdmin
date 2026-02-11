@@ -1,7 +1,7 @@
 # Get Trades - Obtener Trades (Compras y Ventas)
 
 ## Descripción
-Endpoint para obtener todos los trades (transacciones) del sistema con paginación y filtros opcionales por tipo. Este endpoint sirve tanto para obtener **PURCHASE** (compras) como **SALE** (ventas).
+Endpoint para obtener los trades (transacciones) de un shipment específico con paginación y filtros opcionales por tipo. Este endpoint sirve tanto para obtener **PURCHASE** (compras) como **SALE** (ventas) de un envío determinado.
 
 ## Endpoint
 ```
@@ -18,6 +18,9 @@ Authorization: Bearer <token>
 
 ## Query Parameters
 
+### Parámetros Requeridos
+- `shipment_id` (uint): ID del shipment (envío) del cual se desean obtener los trades
+
 ### Parámetros Opcionales
 - `page` (int): Número de página. Por defecto: 1
 - `limit` (int): Cantidad de registros por página. Por defecto: 50, máximo: 200
@@ -25,29 +28,29 @@ Authorization: Bearer <token>
 
 ## Ejemplos de Uso
 
-### Obtener todos los trades (sin filtro)
+### Obtener todos los trades de un shipment (sin filtro por tipo)
 ```
-GET /api/v1/trades?page=1&limit=50
+GET /api/v1/trades?shipment_id=1&page=1&limit=50
 ```
-Trae los primeros 50 trades (tanto compras como ventas).
+Trae los primeros 50 trades (tanto compras como ventas) del shipment con ID 1.
 
-### Obtener solo compras (PURCHASE)
+### Obtener solo compras (PURCHASE) de un shipment
 ```
-GET /api/v1/trades?page=1&limit=50&trade_type=PURCHASE
+GET /api/v1/trades?shipment_id=1&page=1&limit=50&trade_type=PURCHASE
 ```
-Trae los primeros 50 trades de tipo PURCHASE (compras).
+Trae los primeros 50 trades de tipo PURCHASE (compras) del shipment con ID 1.
 
-### Obtener solo ventas (SALE)
+### Obtener solo ventas (SALE) de un shipment
 ```
-GET /api/v1/trades?page=1&limit=50&trade_type=SALE
+GET /api/v1/trades?shipment_id=1&page=1&limit=50&trade_type=SALE
 ```
-Trae los primeros 50 trades de tipo SALE (ventas).
+Trae los primeros 50 trades de tipo SALE (ventas) del shipment con ID 1.
 
 ### Paginación
 ```
-GET /api/v1/trades?page=2&limit=50
+GET /api/v1/trades?shipment_id=1&page=2&limit=50
 ```
-Trae los registros 51-100 (segunda página con 50 registros por página).
+Trae los registros 51-100 (segunda página con 50 registros por página) del shipment con ID 1.
 
 ## Response
 
@@ -130,36 +133,45 @@ Trae los registros 51-100 (segunda página con 50 registros por página).
 ### Error (400 Bad Request)
 ```json
 {
+  "error": "shipment_id es requerido"
+}
+```
+
+O
+
+```json
+{
   "error": "trade_type debe ser 'PURCHASE' o 'SALE'"
 }
 ```
 
 ## Ejemplo de Uso
 
-### cURL - Obtener todos los trades
+### cURL - Obtener todos los trades de un shipment
 ```bash
-curl -X GET "http://localhost:5001/api/v1/trades?page=1&limit=50" \
+curl -X GET "http://localhost:5001/api/v1/trades?shipment_id=1&page=1&limit=50" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
-### cURL - Obtener solo compras
+### cURL - Obtener solo compras de un shipment
 ```bash
-curl -X GET "http://localhost:5001/api/v1/trades?page=1&limit=50&trade_type=PURCHASE" \
+curl -X GET "http://localhost:5001/api/v1/trades?shipment_id=1&page=1&limit=50&trade_type=PURCHASE" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
-### cURL - Obtener solo ventas
+### cURL - Obtener solo ventas de un shipment
 ```bash
-curl -X GET "http://localhost:5001/api/v1/trades?page=1&limit=50&trade_type=SALE" \
+curl -X GET "http://localhost:5001/api/v1/trades?shipment_id=1&page=1&limit=50&trade_type=SALE" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 ### JavaScript (Fetch)
 ```javascript
 const token = localStorage.getItem('token');
+const shipmentId = 1; // ID del shipment
 
-// Obtener todos los trades
-const response = await fetch('http://localhost:5001/api/v1/trades?page=1&limit=50', {
+// Obtener todos los trades de un shipment
+const response = await fetch(`http://localhost:5001/api/v1/trades?shipment_id=${shipmentId}&page=1&limit=50`, {
   method: 'GET',
   headers: {
     'Authorization': `Bearer ${token}`
@@ -170,16 +182,16 @@ const data = await response.json();
 console.log(`Total de trades: ${data.total}`);
 console.log(`Página ${data.page} de ${data.total_pages}`);
 
-// Obtener solo compras
-const purchasesResponse = await fetch('http://localhost:5001/api/v1/trades?trade_type=PURCHASE', {
+// Obtener solo compras de un shipment
+const purchasesResponse = await fetch(`http://localhost:5001/api/v1/trades?shipment_id=${shipmentId}&trade_type=PURCHASE`, {
   method: 'GET',
   headers: {
     'Authorization': `Bearer ${token}`
   }
 });
 
-// Obtener solo ventas
-const salesResponse = await fetch('http://localhost:5001/api/v1/trades?trade_type=SALE', {
+// Obtener solo ventas de un shipment
+const salesResponse = await fetch(`http://localhost:5001/api/v1/trades?shipment_id=${shipmentId}&trade_type=SALE`, {
   method: 'GET',
   headers: {
     'Authorization': `Bearer ${token}`
@@ -188,12 +200,13 @@ const salesResponse = await fetch('http://localhost:5001/api/v1/trades?trade_typ
 ```
 
 ## Notas
-- **Este endpoint trae TODOS los trades del sistema**, no solo los del usuario autenticado
+- **Este endpoint trae los trades de un shipment específico**, identificado por el parámetro requerido `shipment_id`
 - Los resultados están ordenados por fecha descendente (los más recientes primero)
+- El parámetro `shipment_id` es **requerido** y debe ser un ID válido de shipment
 - El filtro `trade_type` es opcional:
-  - Sin `trade_type`: Trae tanto compras como ventas
-  - Con `trade_type=PURCHASE`: Trae solo compras
-  - Con `trade_type=SALE`: Trae solo ventas
+  - Sin `trade_type`: Trae tanto compras como ventas del shipment
+  - Con `trade_type=PURCHASE`: Trae solo compras del shipment
+  - Con `trade_type=SALE`: Trae solo ventas del shipment
 - La paginación funciona con `limit` y `offset` calculado automáticamente desde `page`
 - Por defecto trae 50 registros por página
 - El máximo permitido es 200 registros por página
