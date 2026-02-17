@@ -8,6 +8,8 @@ import aimar.rojas.avmadmin.features.home.presentation.HomeScreen
 import aimar.rojas.avmadmin.features.login.presentation.LoginScreen
 import aimar.rojas.avmadmin.features.register.presentation.RegisterScreen
 import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsScreen
+import aimar.rojas.avmadmin.features.parties.presentation.ProducersScreen
+import aimar.rojas.avmadmin.features.parties.presentation.PurchasesScreen
 
 @Composable
 fun NavGraph(
@@ -32,6 +34,14 @@ fun NavGraph(
         
         composable("shipments") {
             ShipmentsScreen(navController = navController)
+        }
+
+        composable("producers") {
+            ProducersScreen(navController = navController)
+        }
+
+        composable("purchases") {
+            PurchasesScreen(navController = navController)
         }
     }
 }

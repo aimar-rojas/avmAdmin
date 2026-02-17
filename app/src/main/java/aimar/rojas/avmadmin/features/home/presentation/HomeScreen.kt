@@ -79,14 +79,14 @@ fun HomeScreen(
                 modifier = Modifier.weight(1f),
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                onClick = { /* TODO: Navigate to productores */ }
+                onClick = { navController.navigate("producers") }
             )
             OptionCard(
                 title = "Compradores",
                 modifier = Modifier.weight(1f),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                onClick = { /* TODO: Navigate to compradores */ }
+                onClick = { navController.navigate("purchases") }
             )
         }
 
