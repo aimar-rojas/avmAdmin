@@ -17,6 +17,7 @@ okhttp = "4.12.0"
 gson = "2.10.1"
 androidbrowserhelper = "2.6.2"
 datastore = "1.1.1"
+coreSplashscreen = "1.0.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -46,6 +47,7 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 androidbrowserhelper = { group = "com.google.androidbrowserhelper", name = "androidbrowserhelper", version.ref = "androidbrowserhelper" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

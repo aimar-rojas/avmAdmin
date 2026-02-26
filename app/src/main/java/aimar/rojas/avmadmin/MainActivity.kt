@@ -12,31 +12,44 @@ import androidx.navigation.compose.rememberNavController
 import aimar.rojas.avmadmin.core.navigation.NavGraph
 import aimar.rojas.avmadmin.domain.repository.AuthRepository
 import aimar.rojas.avmadmin.ui.theme.AVMAdminTheme
+import androidx.activity.viewModels
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import androidx.compose.runtime.collectAsState
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     
     @Inject
     lateinit var authRepository: AuthRepository
-    
+
+    private val viewModel: MainViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
+
         super.onCreate(savedInstanceState)
+
+        splashScreen.setKeepOnScreenCondition {
+            viewModel.isLoading.value
+        }
+
         enableEdgeToEdge()
+
         setContent {
             AVMAdminTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    val navController = rememberNavController()
-                    val startDestination = if (authRepository.isLoggedIn()) "home" else "login"
-                    
-                    NavGraph(
-                        navController = navController,
-                        startDestination = startDestination
-                    )
+                if (!viewModel.isLoading.collectAsState().value) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        val navController = rememberNavController()
+                        NavGraph(
+                            navController = navController,
+                            startDestination = viewModel.startDestination
+                        )
+                    }
                 }
             }
         }
