@@ -31,8 +31,11 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun logout() {
-        authRepository.logout()
+    fun logout(onLogoutSuccess: () -> Unit) {
+        viewModelScope.launch {
+            authRepository.logout()
+            onLogoutSuccess()
+        }
     }
 }
 

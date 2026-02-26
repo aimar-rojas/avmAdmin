@@ -20,9 +20,6 @@ import androidx.compose.runtime.collectAsState
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    
-    @Inject
-    lateinit var authRepository: AuthRepository
 
     private val viewModel: MainViewModel by viewModels()
 

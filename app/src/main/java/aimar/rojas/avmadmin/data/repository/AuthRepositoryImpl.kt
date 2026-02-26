@@ -27,9 +27,9 @@ class AuthRepositoryImpl @Inject constructor(
             
             if (response.isSuccessful && response.body() != null) {
                 val authResponseDto = response.body()!!
-                // Convertir DTO a modelo de dominio
+
                 val authResponse = authResponseDto.toDomain()
-                // Guardar token, usuario y estado de perfil
+
                 tokenDataStore.saveToken(authResponse.token)
                 sessionDataStore.saveUser(authResponse.user)
                 sessionDataStore.saveIsCompletedProfile(authResponse.isCompletedProfile)
@@ -62,7 +62,6 @@ class AuthRepositoryImpl @Inject constructor(
             
             if (response.isSuccessful && response.body() != null) {
                 val registerResponseDto = response.body()!!
-                // Convertir DTO a modelo de dominio
                 val registerResponse = registerResponseDto.toDomain()
                 Result.success(registerResponse)
             } else {
@@ -78,21 +77,15 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun logout() {
-        runBlocking {
-            sessionDataStore.clearSession()
-        }
+    override suspend fun isLoggedIn(): Boolean {
+        return sessionDataStore.isLoggedIn()
     }
 
-    override fun isLoggedIn(): Boolean {
-        return runBlocking {
-            sessionDataStore.isLoggedIn()
-        }
+    override suspend fun logout() {
+        sessionDataStore.clearSession()
     }
 
-    override fun getCurrentToken(): String? {
-        return runBlocking {
-            sessionDataStore.getToken()
-        }
+    override suspend fun getCurrentToken(): String? {
+        return sessionDataStore.getToken()
     }
 }

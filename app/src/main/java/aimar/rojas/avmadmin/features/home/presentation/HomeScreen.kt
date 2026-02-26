@@ -94,9 +94,10 @@ fun HomeScreen(
 
         Button(
             onClick = {
-                viewModel.logout()
-                navController.navigate("login") {
-                    popUpTo(0) { inclusive = true }
+                viewModel.logout {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
