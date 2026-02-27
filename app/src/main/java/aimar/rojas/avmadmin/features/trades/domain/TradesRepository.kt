@@ -9,6 +9,16 @@ interface TradesRepository {
         limit: Int = 50,
         tradeType: String? = null
     ): Result<TradesResult>
+
+    suspend fun createTrade(
+        partyId: Int,
+        shipmentId: Int,
+        tradeType: String,
+        startDatetime: String,
+        endDatetime: String? = null,
+        discountWeightPerTray: Double,
+        varietyAvocado: String
+    ): Result<Trade>
 }
 
 data class TradesResult(

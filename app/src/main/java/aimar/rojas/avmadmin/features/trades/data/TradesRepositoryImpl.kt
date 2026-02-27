@@ -49,4 +49,41 @@ class TradesRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun createTrade(
+        partyId: Int,
+        shipmentId: Int,
+        tradeType: String,
+        startDatetime: String,
+        endDatetime: String?,
+        discountWeightPerTray: Double,
+        varietyAvocado: String
+    ): Result<aimar.rojas.avmadmin.domain.model.Trade> {
+        return try {
+            val request = CreateTradeRequest(
+                partyId = partyId,
+                shipmentId = shipmentId,
+                tradeType = tradeType,
+                startDatetime = startDatetime,
+                endDatetime = endDatetime,
+                discountWeightPerTray = discountWeightPerTray,
+                varietyAvocado = varietyAvocado
+            )
+            val response = tradesApiService.createTrade(request)
+            
+            if (response.isSuccessful && response.body() != null) {
+                val tradeDto = response.body()!!.trade
+                Result.success(tradeDto.toDomain())
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Error desconocido"
+                Result.failure(Exception(errorMessage))
+            }
+        } catch (e: HttpException) {
+            Result.failure(Exception("Error de servidor: ${e.code()}"))
+        } catch (e: IOException) {
+            Result.failure(Exception("Error de conexión: ${e.message}"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

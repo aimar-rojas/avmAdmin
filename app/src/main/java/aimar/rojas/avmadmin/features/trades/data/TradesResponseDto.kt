@@ -56,3 +56,25 @@ data class TradesResponseDto(
     @SerializedName("has_previous")
     val hasPrevious: Boolean
 )
+
+data class CreateTradeRequest(
+    @SerializedName("party_id")
+    val partyId: Int,
+    @SerializedName("shipment_id")
+    val shipmentId: Int,
+    @SerializedName("trade_type")
+    val tradeType: String,
+    @SerializedName("start_datetime")
+    val startDatetime: String,
+    @SerializedName("end_datetime")
+    val endDatetime: String? = null,
+    @SerializedName("discount_weight_per_tray")
+    val discountWeightPerTray: Double,
+    @SerializedName("variety_avocado")
+    val varietyAvocado: String
+)
+
+data class CreateTradeResponseDto(
+    val message: String,
+    val trade: TradeDto
+)

@@ -1,5 +1,6 @@
 package aimar.rojas.avmadmin.features.shipments.presentation
 
+import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateTradeDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -90,33 +91,67 @@ fun ShipmentsDetailScreen(
                         }
                     }
                     else -> {
-                        val currentList = if (selectedTabIndex == 0) uiState.purchases else uiState.sales
+                        val isPurchaseTab = selectedTabIndex == 0
+                        val currentList = if (isPurchaseTab) uiState.purchases else uiState.sales
+                        val tradeType = if (isPurchaseTab) "PURCHASE" else "SALE"
+                        val buttonText = if (isPurchaseTab) "Agregar nueva compra" else "Agregar nueva venta"
                         
-                        if (currentList.isEmpty()) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "No hay ${tabs[selectedTabIndex].lowercase()} registradas",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                                )
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(currentList) { trade ->
-                                    TradeItem(trade = trade)
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            if (currentList.isEmpty()) {
+                                Box(
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No hay ${tabs[selectedTabIndex].lowercase()} registradas",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                    )
                                 }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    contentPadding = PaddingValues(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(currentList) { trade ->
+                                        TradeItem(trade = trade)
+                                    }
+                                }
+                            }
+                            
+                            Button(
+                                onClick = { viewModel.showCreateDialog(tradeType) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Text(buttonText)
                             }
                         }
                     }
                 }
             }
+        }
+
+        if (uiState.showCreateDialog) {
+            CreateTradeDialog(
+                uiState = uiState,
+                onDismiss = { viewModel.hideCreateDialog() },
+                onPartySelected = { viewModel.onPartySelected(it) },
+                onStartDatetimeChange = { viewModel.onStartDatetimeChange(it) },
+                onEndDatetimeChange = { viewModel.onEndDatetimeChange(it) },
+                onDiscountWeightChange = { viewModel.onDiscountWeightChange(it) },
+                onVarietyChange = { viewModel.onVarietyAvocadoChange(it) },
+                onStatusChange = { viewModel.onCreateStatusChange(it) },
+                onCreate = { viewModel.createTrade() },
+                onStartDatetimeSelected = { viewModel.onStartDatetimeSelected(it) },
+                onEndDatetimeSelected = { viewModel.onEndDatetimeSelected(it) },
+                onShowStartDateTimePicker = { viewModel.showStartDateTimePicker() },
+                onHideStartDateTimePicker = { viewModel.hideStartDateTimePicker() },
+                onShowEndDateTimePicker = { viewModel.showEndDateTimePicker() },
+                onHideEndDateTimePicker = { viewModel.hideEndDateTimePicker() }
+            )
         }
     }
 }
