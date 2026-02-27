@@ -10,6 +10,9 @@ import aimar.rojas.avmadmin.features.register.presentation.RegisterScreen
 import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsScreen
 import aimar.rojas.avmadmin.features.parties.presentation.ProducersScreen
 import aimar.rojas.avmadmin.features.parties.presentation.PurchasesScreen
+import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsDetailScreen
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 
 @Composable
 fun NavGraph(
@@ -42,6 +45,13 @@ fun NavGraph(
 
         composable("purchases") {
             PurchasesScreen(navController = navController)
+        }
+
+        composable(
+            route = "shipments_detail/{shipmentId}",
+            arguments = listOf(navArgument("shipmentId") { type = NavType.IntType })
+        ) {
+            ShipmentsDetailScreen(navController = navController)
         }
     }
 }

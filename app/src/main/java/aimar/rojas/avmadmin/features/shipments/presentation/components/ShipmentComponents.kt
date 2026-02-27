@@ -1,6 +1,7 @@
 package aimar.rojas.avmadmin.features.shipments.presentation.components
 
 import aimar.rojas.avmadmin.domain.model.Shipment
+import aimar.rojas.avmadmin.domain.model.Trade
 import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsUiState
 import aimar.rojas.avmadmin.utils.DateUtils
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +41,10 @@ import androidx.compose.ui.unit.dp
 import java.util.Date
 
 @Composable
-fun ShipmentCard(shipment: Shipment) {
+fun ShipmentCard(
+    shipment: Shipment,
+    onClick: () -> Unit = {}
+) {
     val statusColor = when (shipment.status) {
         "OPEN" -> MaterialTheme.colorScheme.primary
         "CLOSED" -> MaterialTheme.colorScheme.secondary
@@ -49,6 +53,7 @@ fun ShipmentCard(shipment: Shipment) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -311,4 +316,67 @@ fun CreateShipmentDialog(
         },
         containerColor = MaterialTheme.colorScheme.surface
     )
+}
+
+@Composable
+fun TradeItem(trade: Trade) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (trade.tradeType == "PURCHASE") "Compra" else "Venta",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (trade.tradeType == "PURCHASE") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "ID: ${trade.tradeId}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Monto: S/ ${String.format("%.2f", trade.amountPerTrade)}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Peso desc: ${trade.discountWeightPerTray} kg/bandeja",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = trade.startDatetime.substringBefore("T"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
 }

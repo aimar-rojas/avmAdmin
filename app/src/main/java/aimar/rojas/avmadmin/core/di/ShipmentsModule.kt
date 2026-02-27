@@ -1,8 +1,10 @@
 package aimar.rojas.avmadmin.core.di
 
-import aimar.rojas.avmadmin.features.shipments.data.ShipmentsApiService
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentsRepositoryImpl
 import aimar.rojas.avmadmin.features.shipments.domain.ShipmentsRepository
+import aimar.rojas.avmadmin.features.trades.data.TradesApiService
+import aimar.rojas.avmadmin.features.trades.data.TradesRepositoryImpl
+import aimar.rojas.avmadmin.features.trades.domain.TradesRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -17,8 +19,14 @@ object ShipmentsModule {
 
     @Provides
     @Singleton
-    fun provideShipmentsApiService(retrofit: Retrofit): ShipmentsApiService {
-        return retrofit.create(ShipmentsApiService::class.java)
+    fun provideShipmentsApiService(retrofit: Retrofit): aimar.rojas.avmadmin.features.shipments.data.ShipmentsApiService {
+        return retrofit.create(aimar.rojas.avmadmin.features.shipments.data.ShipmentsApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTradesApiService(retrofit: Retrofit): TradesApiService {
+        return retrofit.create(TradesApiService::class.java)
     }
 }
 
@@ -31,4 +39,10 @@ abstract class ShipmentsRepositoryModule {
     abstract fun bindShipmentsRepository(
         shipmentsRepositoryImpl: ShipmentsRepositoryImpl
     ): ShipmentsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTradesRepository(
+        tradesRepositoryImpl: TradesRepositoryImpl
+    ): TradesRepository
 }

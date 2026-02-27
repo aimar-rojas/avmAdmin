@@ -108,7 +108,10 @@ fun ShipmentsScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(uiState.shipments) { shipment ->
-                                ShipmentCard(shipment = shipment)
+                                ShipmentCard(
+                                    shipment = shipment,
+                                    onClick = { navController.navigate("shipments_detail/${shipment.shipmentId}") }
+                                )
                             }
                         }
                     }
