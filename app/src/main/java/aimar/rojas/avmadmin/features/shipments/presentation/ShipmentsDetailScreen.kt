@@ -115,7 +115,10 @@ fun ShipmentsDetailScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(currentList) { trade ->
-                                        TradeItem(trade = trade)
+                                        TradeItem(
+                                            trade = trade,
+                                            onClick = { navController.navigate("trade_selections/${trade.tradeId}") }
+                                        )
                                     }
                                 }
                             }

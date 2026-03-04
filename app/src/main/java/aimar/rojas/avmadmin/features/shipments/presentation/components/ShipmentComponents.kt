@@ -622,9 +622,10 @@ fun CreateTradeDialog(
 }
 
 @Composable
-fun TradeItem(trade: Trade) {
+fun TradeItem(trade: Trade, onClick: () -> Unit = {}) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
