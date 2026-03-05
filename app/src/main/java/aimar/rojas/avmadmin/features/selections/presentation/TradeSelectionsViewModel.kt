@@ -16,7 +16,17 @@ import javax.inject.Inject
 data class TradeSelectionsUiState(
     val isLoading: Boolean = true,
     val selections: List<SelectionDetail> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
+    val selectedSelectionTypeId: Int = 1,
+    val weightInput: String = "",
+    val amountInput: String = "",
+    val totalWeight: Double = 0.0,
+    val totalAmount: Int = 0
+)
+
+data class SelectionTypeInfo(
+    val id: Int,
+    val name: String
 )
 
 @HiltViewModel
@@ -29,6 +39,16 @@ class TradeSelectionsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(TradeSelectionsUiState())
     val uiState: StateFlow<TradeSelectionsUiState> = _uiState.asStateFlow()
+
+    val selectionTypes = listOf(
+        SelectionTypeInfo(1, "Sin pita"),
+        SelectionTypeInfo(2, "Verde"),
+        SelectionTypeInfo(3, "Blanco"),
+        SelectionTypeInfo(4, "Rojo"),
+        SelectionTypeInfo(5, "Azul"),
+        SelectionTypeInfo(6, "Morado"),
+        SelectionTypeInfo(7, "Amarillo")
+    )
 
     init {
         loadSelections()
@@ -44,10 +64,38 @@ class TradeSelectionsViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             val result = selectionsRepository.getSelections(tradeId = tradeId)
             result.onSuccess { selections ->
-                _uiState.update { it.copy(isLoading = false, selections = selections, error = null) }
+                val totalW = selections.sumOf { s -> s.unitWeights.sumOf { it.weight * it.amount } }
+                val totalA = selections.sumOf { s -> s.unitWeights.sumOf { it.amount } }
+                
+                _uiState.update { it.copy(
+                    isLoading = false, 
+                    selections = selections, 
+                    totalWeight = totalW,
+                    totalAmount = totalA,
+                    error = null
+                ) }
             }.onFailure { error ->
                 _uiState.update { it.copy(isLoading = false, error = error.message ?: "Error desconocido") }
             }
         }
+    }
+
+    fun onSelectionTypeSelected(id: Int) {
+        _uiState.update { it.copy(selectedSelectionTypeId = id) }
+    }
+
+    fun onWeightInputChange(value: String) {
+        _uiState.update { it.copy(weightInput = value) }
+    }
+
+    fun onAmountInputChange(value: String) {
+        _uiState.update { it.copy(amountInput = value) }
+    }
+
+    fun insertUnitWeight() {
+        // TODO: Implementar llamada al repositorio para guardar el nuevo unit weight
+        // Una vez guardado exitosamente, recargaríamos las selecciones
+        _uiState.update { it.copy(weightInput = "", amountInput = "") }
+        loadSelections() // Recargar para ver los cambios
     }
 }
