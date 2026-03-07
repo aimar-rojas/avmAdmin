@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -33,6 +36,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -41,6 +46,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,6 +54,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import java.util.Locale
@@ -63,14 +71,18 @@ fun TradeSelectionsScreen(
     TradeSelectionsContent(
         tradeId = tradeId,
         uiState = uiState,
-        selectionTypes = viewModel.selectionTypes,
+        allSelectionTypes = viewModel.selectionTypes,
+        visibleSelectionTypes = viewModel.getVisibleSelectionTypes(),
         onBackClick = { navController.popBackStack() },
         onRetryClick = { viewModel.loadSelections() },
         onSelectionTypeSelected = { viewModel.onSelectionTypeSelected(it) },
         onWeightChange = { viewModel.onWeightInputChange(it) },
         onAmountChange = { viewModel.onAmountInputChange(it) },
         onInsertClick = { viewModel.insertUnitWeight() },
-        onDoneClick = { navController.popBackStack() }
+        onDoneClick = { navController.popBackStack() },
+        onShowSelectionManager = { viewModel.showSelectionManagerDialog() },
+        onHideSelectionManager = { viewModel.hideSelectionManagerDialog() },
+        onToggleSelectionVisibility = { viewModel.toggleSelectionVisibility(it) }
     )
 }
 
@@ -79,14 +91,18 @@ fun TradeSelectionsScreen(
 fun TradeSelectionsContent(
     tradeId: Int,
     uiState: TradeSelectionsUiState,
-    selectionTypes: List<SelectionTypeInfo>,
+    allSelectionTypes: List<SelectionTypeInfo>,
+    visibleSelectionTypes: List<SelectionTypeInfo>,
     onBackClick: () -> Unit,
     onRetryClick: () -> Unit,
     onSelectionTypeSelected: (Int) -> Unit,
     onWeightChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
     onInsertClick: () -> Unit,
-    onDoneClick: () -> Unit
+    onDoneClick: () -> Unit,
+    onShowSelectionManager: () -> Unit,
+    onHideSelectionManager: () -> Unit,
+    onToggleSelectionVisibility: (Int) -> Unit
 ) {
     val accentColor = getSelectionColor(uiState.selectedSelectionTypeId)
 
@@ -146,13 +162,22 @@ fun TradeSelectionsContent(
             } else if (uiState.error != null) {
                 ErrorView(error = uiState.error, onRetry = onRetryClick)
             } else {
-                // Selector de Tipo de Selección
                 SelectionTypeSelector(
-                    selectionTypes = selectionTypes,
+                    selectionTypes = visibleSelectionTypes,
                     selectedId = uiState.selectedSelectionTypeId,
                     onSelected = onSelectionTypeSelected,
-                    accentColor = accentColor
+                    accentColor = accentColor,
+                    onManageClick = onShowSelectionManager
                 )
+
+                if (uiState.showSelectionManagerDialog) {
+                    SelectionManagerDialog(
+                        allSelectionTypes = allSelectionTypes,
+                        visibleSelectionTypeIds = uiState.visibleSelectionTypeIds,
+                        onDismiss = onHideSelectionManager,
+                        onToggleVisibility = onToggleSelectionVisibility
+                    )
+                }
 
                 // Formulario de Inserción
                 UnitWeightInputForm(
@@ -221,6 +246,13 @@ private fun getSelectionColor(id: Int): Color {
 
 @Composable
 fun TradeSummaryHeader(totalWeight: Double, totalAmount: Int, accentColor: Color) {
+    val isDarkMode = isSystemInDarkTheme()
+    val textColor = when {
+        accentColor == Color(0xFFE0E0E0) -> Color.Black
+        accentColor == Color.Black && isDarkMode -> Color.White
+        else -> accentColor
+    }
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -241,7 +273,7 @@ fun TradeSummaryHeader(totalWeight: Double, totalAmount: Int, accentColor: Color
                     text = String.format(Locale.getDefault(), "%.2f kg", totalWeight),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (accentColor == Color(0xFFE0E0E0)) Color.Black else accentColor
+                    color = textColor
                 )
             }
             VerticalDivider(modifier = Modifier.height(40.dp))
@@ -251,7 +283,7 @@ fun TradeSummaryHeader(totalWeight: Double, totalAmount: Int, accentColor: Color
                     text = "$totalAmount",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (accentColor == Color(0xFFE0E0E0)) Color.Black else accentColor
+                    color = textColor
                 )
             }
         }
@@ -263,26 +295,56 @@ fun SelectionTypeSelector(
     selectionTypes: List<SelectionTypeInfo>,
     selectedId: Int,
     onSelected: (Int) -> Unit,
-    accentColor: Color
+    accentColor: Color,
+    onManageClick: () -> Unit
 ) {
-    ScrollableTabRow(
-        selectedTabIndex = selectionTypes.indexOfFirst { it.id == selectedId }.coerceAtLeast(0),
-        edgePadding = 16.dp,
-        containerColor = Color.Transparent,
-        contentColor = accentColor,
-        divider = {}
+    val isDarkMode = isSystemInDarkTheme()
+    
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        selectionTypes.forEach { type ->
-            Tab(
-                selected = type.id == selectedId,
-                onClick = { onSelected(type.id) },
-                text = {
-                    Text(
-                        text = type.name,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (type.id == selectedId) accentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
+        ScrollableTabRow(
+            selectedTabIndex = selectionTypes.indexOfFirst { it.id == selectedId }.coerceAtLeast(0),
+            edgePadding = 16.dp,
+            containerColor = Color.Transparent,
+            contentColor = accentColor,
+            divider = {},
+            modifier = Modifier.weight(1f)
+        ) {
+            selectionTypes.forEach { type ->
+                val tabTextColor = if (type.id == selectedId) {
+                    if (type.id == 1 && accentColor == Color.Black && isDarkMode) {
+                        Color.White
+                    } else {
+                        accentColor
+                    }
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 }
+                
+                Tab(
+                    selected = type.id == selectedId,
+                    onClick = { onSelected(type.id) },
+                    text = {
+                        Text(
+                            text = type.name,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = tabTextColor
+                        )
+                    }
+                )
+            }
+        }
+
+        IconButton(
+            onClick = onManageClick,
+            modifier = Modifier.padding(end = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.FilterList,
+                contentDescription = "Gestionar selecciones",
+                tint = accentColor
             )
         }
     }
@@ -380,6 +442,169 @@ fun UnitWeightItem(unitWeight: UnitWeightDetail, accentColor: Color) {
 }
 
 @Composable
+fun SelectionManagerDialog(
+    allSelectionTypes: List<SelectionTypeInfo>,
+    visibleSelectionTypeIds: Set<Int>,
+    onDismiss: () -> Unit,
+    onToggleVisibility: (Int) -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .wrapContentHeight(),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Gestionar Selecciones",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Text(
+                    text = "Activa o desactiva los tipos de selección que deseas trabajar",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.height(400.dp)
+                ) {
+                    items(allSelectionTypes) { selectionType ->
+                        SelectionTypeToggleItem(
+                            selectionType = selectionType,
+                            isVisible = visibleSelectionTypeIds.contains(selectionType.id),
+                            onToggle = { onToggleVisibility(selectionType.id) },
+                            canDisable = visibleSelectionTypeIds.size > 1
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text(
+                        text = "Cerrar",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SelectionTypeToggleItem(
+    selectionType: SelectionTypeInfo,
+    isVisible: Boolean,
+    onToggle: () -> Unit,
+    canDisable: Boolean
+) {
+    val selectionColor = getSelectionColor(selectionType.id)
+    val canToggle = !isVisible || canDisable
+    
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = if (isVisible) {
+            selectionColor.copy(alpha = 0.1f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = selectionColor,
+                    modifier = Modifier
+                        .width(24.dp)
+                        .height(24.dp)
+                ) {
+                    if (isVisible) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = if (selectionColor == Color.Black || selectionColor == Color(0xFFE0E0E0)) {
+                                    Color.White
+                                } else {
+                                    Color.Black
+                                },
+                                modifier = Modifier.width(16.dp)
+                            )
+                        }
+                    }
+                }
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = selectionType.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (isVisible) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isVisible) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        }
+                    )
+                    Text(
+                        text = if (isVisible) "Visible en tabs" else "Oculta",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            
+            Switch(
+                checked = isVisible,
+                onCheckedChange = { if (canToggle) onToggle() },
+                enabled = canToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = selectionColor,
+                    checkedTrackColor = selectionColor.copy(alpha = 0.5f),
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+        }
+    }
+}
+
+@Composable
 fun ErrorView(error: String, onRetry: () -> Unit) {
     Column(
         modifier = Modifier
@@ -421,7 +646,12 @@ fun TradeSelectionsPreview() {
                     )
                 )
             ),
-            selectionTypes = listOf(
+            allSelectionTypes = listOf(
+                SelectionTypeInfo(1, "Sin pita"),
+                SelectionTypeInfo(2, "Verde"),
+                SelectionTypeInfo(3, "Blanco")
+            ),
+            visibleSelectionTypes = listOf(
                 SelectionTypeInfo(1, "Sin pita"),
                 SelectionTypeInfo(2, "Verde"),
                 SelectionTypeInfo(3, "Blanco")
@@ -432,7 +662,10 @@ fun TradeSelectionsPreview() {
             onWeightChange = {},
             onAmountChange = {},
             onInsertClick = {},
-            onDoneClick = {}
+            onDoneClick = {},
+            onShowSelectionManager = {},
+            onHideSelectionManager = {},
+            onToggleSelectionVisibility = {}
         )
     }
 }

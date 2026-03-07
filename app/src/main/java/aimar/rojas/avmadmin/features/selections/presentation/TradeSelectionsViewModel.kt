@@ -21,7 +21,9 @@ data class TradeSelectionsUiState(
     val weightInput: String = "",
     val amountInput: String = "",
     val totalWeight: Double = 0.0,
-    val totalAmount: Int = 0
+    val totalAmount: Int = 0,
+    val visibleSelectionTypeIds: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7),
+    val showSelectionManagerDialog: Boolean = false
 )
 
 data class SelectionTypeInfo(
@@ -93,9 +95,44 @@ class TradeSelectionsViewModel @Inject constructor(
     }
 
     fun insertUnitWeight() {
-        // TODO: Implementar llamada al repositorio para guardar el nuevo unit weight
-        // Una vez guardado exitosamente, recargaríamos las selecciones
         _uiState.update { it.copy(weightInput = "", amountInput = "") }
-        loadSelections() // Recargar para ver los cambios
+        loadSelections()
+    }
+
+    fun showSelectionManagerDialog() {
+        _uiState.update { it.copy(showSelectionManagerDialog = true) }
+    }
+
+    fun hideSelectionManagerDialog() {
+        _uiState.update { it.copy(showSelectionManagerDialog = false) }
+    }
+
+    fun toggleSelectionVisibility(selectionTypeId: Int) {
+        _uiState.update { currentState ->
+            val newVisibleIds = if (currentState.visibleSelectionTypeIds.contains(selectionTypeId)) {
+                if (currentState.visibleSelectionTypeIds.size > 1) {
+                    currentState.visibleSelectionTypeIds - selectionTypeId
+                } else {
+                    currentState.visibleSelectionTypeIds
+                }
+            } else {
+                currentState.visibleSelectionTypeIds + selectionTypeId
+            }
+
+            val newSelectedId = if (newVisibleIds.contains(currentState.selectedSelectionTypeId)) {
+                currentState.selectedSelectionTypeId
+            } else {
+                newVisibleIds.minOrNull() ?: currentState.selectedSelectionTypeId
+            }
+            
+            currentState.copy(
+                visibleSelectionTypeIds = newVisibleIds,
+                selectedSelectionTypeId = newSelectedId
+            )
+        }
+    }
+
+    fun getVisibleSelectionTypes(): List<SelectionTypeInfo> {
+        return selectionTypes.filter { it.id in _uiState.value.visibleSelectionTypeIds }
     }
 }
