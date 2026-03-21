@@ -31,12 +31,12 @@ android {
             versionNameSuffix = "-dev"
             resValue("string", "app_name", "AVM Admin Dev")
 //            buildConfigField("String", "BASE_URL", "\"http://192.168.1.8:5001/api/\"")
-            buildConfigField("String", "BASE_URL", "\"https://backavmgin-production.up.railway.app/api/\"")
+            buildConfigField("String", "BASE_URL", "\"https://back-avm.aimarrojas.dev/api/\"")
         }
         create("prod") {
             dimension = "environment"
             resValue("string", "app_name", "AVM Admin")
-            buildConfigField("String", "BASE_URL", "\"https://backavmgin-production.up.railway.app/api/\"")
+            buildConfigField("String", "BASE_URL", "\"https://back-avm.aimarrojas.dev/api/\"")
         }
     }
 
