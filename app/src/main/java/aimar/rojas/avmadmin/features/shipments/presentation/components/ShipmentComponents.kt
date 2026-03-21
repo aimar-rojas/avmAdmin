@@ -5,6 +5,7 @@ import aimar.rojas.avmadmin.domain.model.Trade
 import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsDetailUiState
 import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsUiState
 import aimar.rojas.avmadmin.utils.DateUtils
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -622,7 +625,12 @@ fun CreateTradeDialog(
 }
 
 @Composable
-fun TradeItem(trade: Trade, onClick: () -> Unit = {}) {
+fun TradeItem(
+    trade: Trade,
+    isPendingSync: Boolean = false,
+    onSyncClick: () -> Unit = {},
+    onClick: () -> Unit = {}
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -674,6 +682,37 @@ fun TradeItem(trade: Trade, onClick: () -> Unit = {}) {
                 }
                 
                 Column(horizontalAlignment = Alignment.End) {
+                    if (isPendingSync) {
+                        Surface(
+                            color = Color(0xFFFFA500).copy(alpha = 0.2f),
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .clickable { onSyncClick() }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Sync,
+                                    contentDescription = "Sync",
+                                    tint = Color(0xFFFFA500),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Sincronizar",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFFFA500),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(28.dp)) // Maintain alignment if no button
+                    }
+                    
                     Text(
                         text = trade.startDatetime.substringBefore("T"),
                         style = MaterialTheme.typography.bodySmall,

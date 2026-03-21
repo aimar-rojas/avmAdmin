@@ -12,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Date
 import javax.inject.Inject
@@ -20,6 +21,7 @@ import javax.inject.Inject
 class ShipmentsDetailViewModel @Inject constructor(
     private val tradesRepository: TradesRepository,
     private val partiesRepository: PartiesRepository,
+    private val selectionsRepository: aimar.rojas.avmadmin.features.selections.domain.SelectionsRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -31,6 +33,15 @@ class ShipmentsDetailViewModel @Inject constructor(
     init {
         loadTrades()
         loadParties()
+        observePendingSyncTrades()
+    }
+
+    private fun observePendingSyncTrades() {
+        viewModelScope.launch {
+            selectionsRepository.getPendingSyncTradeIds().collect { pendingIds ->
+                _uiState.update { it.copy(pendingSyncTradeIds = pendingIds.toSet()) }
+            }
+        }
     }
 
     private fun loadParties() {
@@ -211,6 +222,18 @@ class ShipmentsDetailViewModel @Inject constructor(
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
+
+    fun syncTrade(tradeId: Int) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            val result = selectionsRepository.syncAllSelectionsForTrade(tradeId)
+            result.onSuccess {
+                _uiState.update { it.copy(isLoading = false) }
+            }.onFailure { error ->
+                _uiState.update { it.copy(isLoading = false, error = error.message ?: "Error sincronizando") }
+            }
+        }
+    }
 }
 
 data class ShipmentsDetailUiState(
@@ -220,6 +243,7 @@ data class ShipmentsDetailUiState(
     val clients: List<Party> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
+    val pendingSyncTradeIds: Set<Int> = emptySet(),
     
     // Create Trade State
     val showCreateDialog: Boolean = false,

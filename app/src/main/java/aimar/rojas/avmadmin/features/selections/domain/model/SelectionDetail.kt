@@ -6,7 +6,8 @@ data class SelectionDetail(
     val selectionTypeId: Int,
     val price: Double?,
     val unitWeights: List<UnitWeightDetail>,
-    val selectionTypeName: String?
+    val selectionTypeName: String?,
+    val isPendingSync: Boolean = false
 )
 
 data class UnitWeightDetail(

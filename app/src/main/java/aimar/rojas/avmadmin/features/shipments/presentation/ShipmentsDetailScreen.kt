@@ -117,6 +117,8 @@ fun ShipmentsDetailScreen(
                                     items(currentList) { trade ->
                                         TradeItem(
                                             trade = trade,
+                                            isPendingSync = uiState.pendingSyncTradeIds.contains(trade.tradeId),
+                                            onSyncClick = { viewModel.syncTrade(trade.tradeId) },
                                             onClick = { navController.navigate("trade_selections/${trade.tradeId}") }
                                         )
                                     }

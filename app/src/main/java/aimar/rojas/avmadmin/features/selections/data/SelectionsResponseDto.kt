@@ -42,3 +42,23 @@ data class SelectionTypeReferenceDto(
     @SerializedName("name_selection")
     val nameSelection: String
 )
+
+data class UpdateSelectionRequestDto(
+    @SerializedName("trade_id")
+    val tradeId: Int,
+    @SerializedName("selection_type_id")
+    val selectionTypeId: Int,
+    val price: String?,
+    @SerializedName("unit_weights")
+    val unitWeights: List<UnitWeightRequestDto>
+)
+
+data class UnitWeightRequestDto(
+    val weight: String,
+    val amount: Int
+)
+
+data class SelectionUpdateResponseDto(
+    val message: String,
+    val selection: SelectionByTradeDto
+)

@@ -95,9 +95,83 @@ class TradeSelectionsViewModel @Inject constructor(
     }
 
     fun insertUnitWeight() {
-        _uiState.update { it.copy(weightInput = "", amountInput = "") }
-        loadSelections()
+        val weight = _uiState.value.weightInput.toDoubleOrNull()
+        val amount = _uiState.value.amountInput.toIntOrNull()
+        
+        if (weight != null && amount != null) {
+            val currentState = _uiState.value
+            val currentSelection = currentState.selections.find { it.selectionTypeId == currentState.selectedSelectionTypeId }
+            
+            if (currentSelection != null) {
+                // Add the new unit weight to the current selection
+                val newUnitWeight = aimar.rojas.avmadmin.features.selections.domain.model.UnitWeightDetail(
+                    unitWeightId = -(System.nanoTime() % 1000000000).toInt(), // unique negative local ID
+                    weight = weight,
+                    amount = amount
+                )
+                
+                val updatedSelection = currentSelection.copy(
+                    unitWeights = currentSelection.unitWeights + newUnitWeight,
+                    isPendingSync = true
+                )
+                
+                // Clear inputs
+                _uiState.update { it.copy(weightInput = "", amountInput = "") }
+                
+                // Save locally and reload
+                viewModelScope.launch {
+                    selectionsRepository.saveSelectionLocal(updatedSelection)
+                    loadLocalSelections()
+                }
+            } else {
+                // If the selection doesn't exist yet, we create it
+                val newSelection = aimar.rojas.avmadmin.features.selections.domain.model.SelectionDetail(
+                    selectionByTradeId = -(System.nanoTime() % 1000000000).toInt(), // unique negative local ID
+                    tradeId = tradeId,
+                    selectionTypeId = currentState.selectedSelectionTypeId,
+                    price = null,
+                    unitWeights = listOf(
+                        aimar.rojas.avmadmin.features.selections.domain.model.UnitWeightDetail(
+                            unitWeightId = -(System.nanoTime() % 1000000000).toInt(),
+                            weight = weight,
+                            amount = amount
+                        )
+                    ),
+                    selectionTypeName = selectionTypes.find { it.id == currentState.selectedSelectionTypeId }?.name,
+                    isPendingSync = true
+                )
+                
+                _uiState.update { it.copy(weightInput = "", amountInput = "") }
+                
+                viewModelScope.launch {
+                    selectionsRepository.saveSelectionLocal(newSelection)
+                    loadLocalSelections()
+                }
+            }
+        }
     }
+
+    private fun loadLocalSelections() {
+        if (tradeId == -1) return
+        
+        viewModelScope.launch {
+            val result = selectionsRepository.getLocalSelections(tradeId)
+            result.onSuccess { selections ->
+                val totalW = selections.sumOf { s -> s.unitWeights.sumOf { it.weight * it.amount } }
+                val totalA = selections.sumOf { s -> s.unitWeights.sumOf { it.amount } }
+                
+                _uiState.update { it.copy(
+                    selections = selections, 
+                    totalWeight = totalW,
+                    totalAmount = totalA
+                ) }
+            }.onFailure { error ->
+                _uiState.update { it.copy(error = error.message ?: "Error desconocido") }
+            }
+        }
+    }
+
+    // Removed syncWithBackend because sync is now manual from the Trades List
 
     fun showSelectionManagerDialog() {
         _uiState.update { it.copy(showSelectionManagerDialog = true) }
