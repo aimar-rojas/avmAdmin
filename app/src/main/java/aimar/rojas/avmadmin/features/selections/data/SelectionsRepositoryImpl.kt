@@ -92,7 +92,14 @@ class SelectionsRepositoryImpl @Inject constructor(
         return dao.getPendingSyncTradeIds()
     }
 
+    override suspend fun getPendingSyncTradeIdsList(): List<Int> {
+        return dao.getPendingSyncTradeIdsList()
+    }
+
     override suspend fun syncAllSelectionsForTrade(tradeId: Int): Result<Unit> {
+        if (tradeId <= 0) {
+            return Result.failure(Exception("El Negocio aún no se ha sincronizado (ID offline). Por favor espera la sincronización automática."))
+        }
         return try {
             val pendingSelections = dao.getPendingSelectionsByTradeId(tradeId)
             

@@ -12,7 +12,8 @@ interface TradesApiService {
         @Query("shipment_id") shipmentId: Int,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 50,
-        @Query("trade_type") tradeType: String? = null
+        @Query("trade_type") tradeType: String? = null,
+        @Query("updated_after") updatedAfter: String? = null
     ): Response<TradesResponseDto>
 
     @POST("v1/trades")

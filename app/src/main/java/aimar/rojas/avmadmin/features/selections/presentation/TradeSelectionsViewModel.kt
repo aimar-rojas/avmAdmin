@@ -34,10 +34,11 @@ data class SelectionTypeInfo(
 @HiltViewModel
 class TradeSelectionsViewModel @Inject constructor(
     private val selectionsRepository: SelectionsRepository,
+    private val sessionDataStore: aimar.rojas.avmadmin.data.local.SessionDataStore,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val tradeId: Int = savedStateHandle.get<Int>("tradeId") ?: -1
+    private var tradeId: Int = savedStateHandle.get<Int>("tradeId") ?: -1
 
     private val _uiState = MutableStateFlow(TradeSelectionsUiState())
     val uiState: StateFlow<TradeSelectionsUiState> = _uiState.asStateFlow()
@@ -54,6 +55,19 @@ class TradeSelectionsViewModel @Inject constructor(
 
     init {
         loadSelections()
+        observeTradeIdMappings()
+    }
+
+    private fun observeTradeIdMappings() {
+        viewModelScope.launch {
+            sessionDataStore.tradeIdMappingFlow.collect { mapping ->
+                if (tradeId == mapping.first) {
+                    tradeId = mapping.second
+                    android.util.Log.d("AvmAdminSync", "ViewModel dynamically swapped Trade ID from ${mapping.first} to ${mapping.second}")
+                    loadSelections()
+                }
+            }
+        }
     }
 
     fun loadSelections() {

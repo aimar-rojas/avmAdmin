@@ -17,7 +17,8 @@ interface PartiesApiService {
         @Query("last_name") lastName: String? = null,
         @Query("dni") dni: String? = null,
         @Query("ruc") ruc: String? = null,
-        @Query("phone") phone: String? = null
+        @Query("phone") phone: String? = null,
+        @Query("updated_after") updatedAfter: String? = null
     ): Response<PartiesResponseDto>
 
     @POST("v1/parties")

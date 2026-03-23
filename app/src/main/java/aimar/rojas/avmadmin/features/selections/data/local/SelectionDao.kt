@@ -51,10 +51,16 @@ interface SelectionDao {
     @Query("SELECT DISTINCT tradeId FROM selections WHERE isPendingSync = 1")
     fun getPendingSyncTradeIds(): kotlinx.coroutines.flow.Flow<List<Int>>
 
+    @Query("SELECT DISTINCT tradeId FROM selections WHERE isPendingSync = 1")
+    suspend fun getPendingSyncTradeIdsList(): List<Int>
+
     @Transaction
     @Query("SELECT * FROM selections WHERE tradeId = :tradeId AND isPendingSync = 1")
     suspend fun getPendingSelectionsByTradeId(tradeId: Int): List<SelectionWithUnitWeights>
 
     @Query("UPDATE selections SET isPendingSync = 0 WHERE tradeId = :tradeId")
     suspend fun markTradeSelectionsAsSynced(tradeId: Int)
+
+    @Query("UPDATE selections SET tradeId = :newTradeId WHERE tradeId = :oldTradeId")
+    suspend fun updateForeignTradeId(oldTradeId: Int, newTradeId: Int)
 }

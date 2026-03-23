@@ -12,6 +12,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -29,6 +31,11 @@ class SessionDataStore @Inject constructor(
     
     private val userKey = stringPreferencesKey("current_user")
     private val isCompletedProfileKey = booleanPreferencesKey("is_completed_profile")
+    
+    // Sync Metadata
+    private val lastPartySyncKey = stringPreferencesKey("last_party_sync")
+    private val lastShipmentSyncKey = stringPreferencesKey("last_shipment_sync")
+    private val lastTradeSyncKey = stringPreferencesKey("last_trade_sync")
     
     suspend fun saveUser(user: User) {
         val userJson = gson.toJson(user)
@@ -94,5 +101,35 @@ class SessionDataStore @Inject constructor(
     
     suspend fun getToken(): String? {
         return tokenDataStore.getToken()
+    }
+    
+    // Sync methods
+    suspend fun saveLastPartySync(timestamp: String) {
+        dataStore.edit { preferences -> preferences[lastPartySyncKey] = timestamp }
+    }
+    suspend fun getLastPartySync(): String? {
+        return dataStore.data.first()[lastPartySyncKey]
+    }
+
+    suspend fun saveLastShipmentSync(timestamp: String) {
+        dataStore.edit { preferences -> preferences[lastShipmentSyncKey] = timestamp }
+    }
+    suspend fun getLastShipmentSync(): String? {
+        return dataStore.data.first()[lastShipmentSyncKey]
+    }
+
+    suspend fun saveLastTradeSync(timestamp: String) {
+        dataStore.edit { preferences -> preferences[lastTradeSyncKey] = timestamp }
+    }
+    suspend fun getLastTradeSync(): String? {
+        return dataStore.data.first()[lastTradeSyncKey]
+    }
+    
+    // Memory Event Bus for ID Promotions
+    private val _tradeIdMappingFlow = MutableSharedFlow<Pair<Int, Int>>(extraBufferCapacity = 10)
+    val tradeIdMappingFlow = _tradeIdMappingFlow.asSharedFlow()
+
+    fun emitTradeIdMapping(oldId: Int, newId: Int) {
+        _tradeIdMappingFlow.tryEmit(Pair(oldId, newId))
     }
 }

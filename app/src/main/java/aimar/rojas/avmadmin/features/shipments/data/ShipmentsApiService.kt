@@ -10,7 +10,8 @@ interface ShipmentsApiService {
         @Query("limit") limit: Int = 50,
         @Query("status") status: String? = null,
         @Query("start_date") startDate: String? = null,
-        @Query("end_date") endDate: String? = null
+        @Query("end_date") endDate: String? = null,
+        @Query("updated_after") updatedAfter: String? = null
     ): Response<ShipmentsResponseDto>
 
     @POST("v1/shipments")
