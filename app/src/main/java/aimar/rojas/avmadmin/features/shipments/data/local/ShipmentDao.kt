@@ -29,4 +29,7 @@ interface ShipmentDao {
 
     @Query("DELETE FROM shipments WHERE isPendingSync = 0")
     suspend fun clearSyncedShipments()
+
+    @Query("SELECT COUNT(*) FROM shipments")
+    suspend fun getShipmentCount(): Int
 }

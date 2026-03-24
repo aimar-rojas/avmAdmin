@@ -12,6 +12,7 @@ fun TradeDto.toDomain(): Trade {
         startDatetime = startDatetime,
         endDatetime = endDatetime ?: "",
         discountWeightPerTray = discountWeightPerTray,
+        varietyAvocado = varietyAvocado ?: "Hass", // Provide a default if null
         amountPerTrade = amountPerTrade
     )
 }

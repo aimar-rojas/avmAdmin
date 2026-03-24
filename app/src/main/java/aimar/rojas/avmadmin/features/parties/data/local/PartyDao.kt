@@ -29,4 +29,7 @@ interface PartyDao {
 
     @Query("DELETE FROM parties WHERE isPendingSync = 0")
     suspend fun clearSyncedParties()
+
+    @Query("SELECT COUNT(*) FROM parties")
+    suspend fun getPartyCount(): Int
 }

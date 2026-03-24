@@ -627,6 +627,7 @@ fun CreateTradeDialog(
 @Composable
 fun TradeItem(
     trade: Trade,
+    partyName: String,
     isPendingSync: Boolean = false,
     onSyncClick: () -> Unit = {},
     onClick: () -> Unit = {}
@@ -655,70 +656,69 @@ fun TradeItem(
                     color = if (trade.tradeType == "PURCHASE") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = "ID: ${trade.tradeId}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
+                
+                if (isPendingSync) {
+                    Surface(
+                        color = Color(0xFFFFA500).copy(alpha = 0.2f),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .clickable { onSyncClick() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Sync,
+                                contentDescription = "Sync",
+                                tint = Color(0xFFFFA500),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Sincronizar",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFFFA500),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
             
             Spacer(modifier = Modifier.height(4.dp))
             
+            Text(
+                text = partyName,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            Text(
+                text = "Variedad: ${trade.varietyAvocado}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            val startDate = DateUtils.convertApiToDisplayDate(trade.startDatetime.substringBefore("T")) ?: trade.startDatetime.substringBefore("T")
+            val endDate = if (trade.endDatetime.isNotBlank()) {
+                DateUtils.convertApiToDisplayDate(trade.endDatetime.substringBefore("T"))
+            } else null
+            
+            val dateText = if (endDate != null) "$startDate - $endDate" else startDate
+            
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.End
             ) {
-                Column {
-                    Text(
-                        text = "Monto: S/ ${String.format("%.2f", trade.amountPerTrade)}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Peso desc: ${trade.discountWeightPerTray} kg/bandeja",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-                
-                Column(horizontalAlignment = Alignment.End) {
-                    if (isPendingSync) {
-                        Surface(
-                            color = Color(0xFFFFA500).copy(alpha = 0.2f),
-                            shape = MaterialTheme.shapes.small,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    .clickable { onSyncClick() }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Sync,
-                                    contentDescription = "Sync",
-                                    tint = Color(0xFFFFA500),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Sincronizar",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFFFA500),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    } else {
-                        Spacer(modifier = Modifier.height(28.dp)) // Maintain alignment if no button
-                    }
-                    
-                    Text(
-                        text = trade.startDatetime.substringBefore("T"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                }
+                Text(
+                    text = dateText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
             }
         }
     }

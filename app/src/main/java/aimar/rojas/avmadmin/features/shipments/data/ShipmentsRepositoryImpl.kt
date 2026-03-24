@@ -49,7 +49,8 @@ class ShipmentsRepositoryImpl @Inject constructor(
         return try {
             val pending = shipmentDao.getPendingSyncShipments()
             if (pending.isEmpty()) {
-                val lastSync = sessionDataStore.getLastShipmentSync()
+                val count = shipmentDao.getShipmentCount()
+                val lastSync = if (count == 0) null else sessionDataStore.getLastShipmentSync()
                 val response = shipmentsApiService.getShipments(
                     page = page,
                     limit = limit,

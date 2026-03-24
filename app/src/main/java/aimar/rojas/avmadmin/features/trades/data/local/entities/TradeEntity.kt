@@ -15,6 +15,7 @@ data class TradeEntity(
     val startDatetime: String,
     val endDatetime: String?,
     val discountWeightPerTray: Double,
+    val varietyAvocado: String,
     val amountPerTrade: Double,
     
     val isPendingSync: Boolean = false,
@@ -30,6 +31,7 @@ data class TradeEntity(
             startDatetime = startDatetime,
             endDatetime = endDatetime ?: "",
             discountWeightPerTray = discountWeightPerTray,
+            varietyAvocado = varietyAvocado,
             amountPerTrade = amountPerTrade
         )
     }
@@ -45,6 +47,7 @@ fun Trade.toEntity(isPendingSync: Boolean = false, syncOperation: String? = null
         startDatetime = this.startDatetime,
         endDatetime = this.endDatetime,
         discountWeightPerTray = this.discountWeightPerTray,
+        varietyAvocado = this.varietyAvocado,
         amountPerTrade = this.amountPerTrade,
         
         isPendingSync = isPendingSync,

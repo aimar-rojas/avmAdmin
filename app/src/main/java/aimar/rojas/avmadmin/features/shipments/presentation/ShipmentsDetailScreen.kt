@@ -115,8 +115,13 @@ fun ShipmentsDetailScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(currentList) { trade ->
+                                        val parties = if (trade.tradeType == "PURCHASE") uiState.suppliers else uiState.clients
+                                        val party = parties.find { it.partyId == trade.partyId }
+                                        val partyName = party?.let { it.aliasName ?: "${it.firstName} ${it.lastName ?: ""}".trim() } ?: "Desconocido"
+
                                         TradeItem(
                                             trade = trade,
+                                            partyName = partyName,
                                             isPendingSync = uiState.pendingSyncTradeIds.contains(trade.tradeId),
                                             onSyncClick = { viewModel.syncTrade(trade.tradeId) },
                                             onClick = { navController.navigate("trade_selections/${trade.tradeId}") }

@@ -41,7 +41,8 @@ class TradesRepositoryImpl @Inject constructor(
         return try {
             val pending = tradeDao.getPendingSyncTrades()
             if (pending.isEmpty()) {
-                val lastSync = sessionDataStore.getLastTradeSync()
+                val count = tradeDao.getTradeCount()
+                val lastSync = if (count == 0) null else sessionDataStore.getLastTradeSync()
                 val response = tradesApiService.getTrades(
                     shipmentId = shipmentId,
                     page = page,
@@ -63,6 +64,7 @@ class TradesRepositoryImpl @Inject constructor(
                                 startDatetime = dto.startDatetime,
                                 endDatetime = dto.endDatetime,
                                 discountWeightPerTray = dto.discountWeightPerTray,
+                                varietyAvocado = dto.varietyAvocado ?: "Hass",
                                 amountPerTrade = dto.amountPerTrade,
                                 isPendingSync = false,
                                 syncOperation = null
@@ -134,6 +136,7 @@ class TradesRepositoryImpl @Inject constructor(
                 startDatetime = startDatetime,
                 endDatetime = endDatetime,
                 discountWeightPerTray = discountWeightPerTray,
+                varietyAvocado = varietyAvocado,
                 amountPerTrade = 0.0,
                 isPendingSync = true,
                 syncOperation = "CREATE"

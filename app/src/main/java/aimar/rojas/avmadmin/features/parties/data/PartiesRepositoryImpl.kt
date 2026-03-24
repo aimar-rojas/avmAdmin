@@ -42,7 +42,8 @@ class PartiesRepositoryImpl @Inject constructor(
         try {
             val pendingParties = partyDao.getPendingSyncParties()
             if (pendingParties.isEmpty()) {
-                val lastSync = sessionDataStore.getLastPartySync()
+                val count = partyDao.getPartyCount()
+                val lastSync = if (count == 0) null else sessionDataStore.getLastPartySync()
                 val response = partiesApiService.getParties(
                     partyRole = partyRole,
                     firstName = firstName,

@@ -119,7 +119,7 @@ class AvmSyncWorker @AssistedInject constructor(
                     startDatetime = local.startDatetime,
                     endDatetime = local.endDatetime?.takeIf { it.isNotEmpty() },
                     discountWeightPerTray = local.discountWeightPerTray,
-                    varietyAvocado = "Hass" // Default, as it wasn't mapped in Trade entity
+                    varietyAvocado = local.varietyAvocado
                 )
                 val res = tradeApi.createTrade(req)
                 if (res.isSuccessful && res.body() != null) {

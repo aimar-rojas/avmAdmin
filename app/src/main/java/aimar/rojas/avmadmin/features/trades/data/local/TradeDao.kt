@@ -35,4 +35,7 @@ interface TradeDao {
 
     @Query("DELETE FROM trades WHERE isPendingSync = 0")
     suspend fun clearSyncedTrades()
+
+    @Query("SELECT COUNT(*) FROM trades")
+    suspend fun getTradeCount(): Int
 }
