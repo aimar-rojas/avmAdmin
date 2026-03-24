@@ -19,6 +19,8 @@ interface TradesRepository {
         discountWeightPerTray: Double,
         varietyAvocado: String
     ): Result<Trade>
+
+    suspend fun getTradeById(tradeId: Int): Result<Trade>
 }
 
 data class TradesResult(

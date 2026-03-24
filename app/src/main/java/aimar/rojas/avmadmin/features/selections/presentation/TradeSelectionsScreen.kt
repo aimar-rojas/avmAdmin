@@ -79,7 +79,7 @@ fun TradeSelectionsScreen(
         onWeightChange = { viewModel.onWeightInputChange(it) },
         onAmountChange = { viewModel.onAmountInputChange(it) },
         onInsertClick = { viewModel.insertUnitWeight() },
-        onDoneClick = { navController.popBackStack() },
+        onDoneClick = { navController.navigate("trade_summary/$tradeId") },
         onShowSelectionManager = { viewModel.showSelectionManagerDialog() },
         onHideSelectionManager = { viewModel.hideSelectionManagerDialog() },
         onToggleSelectionVisibility = { viewModel.toggleSelectionVisibility(it) }

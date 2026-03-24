@@ -154,6 +154,19 @@ class TradesRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+    override suspend fun getTradeById(tradeId: Int): Result<Trade> {
+        return try {
+            val entity = tradeDao.getTradeById(tradeId)
+            if (entity != null) {
+                Result.success(entity.toDomain())
+            } else {
+                Result.failure(Exception("Trade not found locally"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private fun enqueueSyncWorker() {
         Log.d("AvmAdminSync", "enqueueSyncWorker() triggered in TradesRepositoryImpl")
         try {
