@@ -16,6 +16,8 @@ data class PartyDto(
     val dni: String? = null,
     val ruc: String? = null,
     val phone: String? = null,
+    @SerializedName("account_number")
+    val accountNumber: String? = null,
     @SerializedName("created_at")
     val createdAt: String? = null,
     @SerializedName("updated_at")
@@ -38,7 +40,9 @@ data class CreatePartyRequest(
     val lastName: String? = null,
     val dni: String? = null,
     val ruc: String? = null,
-    val phone: String? = null
+    val phone: String? = null,
+    @SerializedName("account_number")
+    val accountNumber: String? = null
 )
 
 data class UpdatePartyRequest(
@@ -52,7 +56,9 @@ data class UpdatePartyRequest(
     val lastName: String? = null,
     val dni: String? = null,
     val ruc: String? = null,
-    val phone: String? = null
+    val phone: String? = null,
+    @SerializedName("account_number")
+    val accountNumber: String? = null
 )
 
 data class CreatePartyResponseDto(

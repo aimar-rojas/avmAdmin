@@ -15,6 +15,7 @@ data class PartyEntity(
     val dni: String?,
     val ruc: String?,
     val phone: String?,
+    val accountNumber: String?,
     val isPendingSync: Boolean = false,
     val syncOperation: String? = null // CREATE, UPDATE, DELETE
 ) {
@@ -27,7 +28,8 @@ data class PartyEntity(
             lastName = lastName,
             dni = dni,
             ruc = ruc,
-            phone = phone
+            phone = phone,
+            accountNumber = accountNumber
         )
     }
 }
@@ -42,6 +44,7 @@ fun Party.toEntity(isPendingSync: Boolean = false, syncOperation: String? = null
         dni = this.dni,
         ruc = this.ruc,
         phone = this.phone,
+        accountNumber = this.accountNumber,
         isPendingSync = isPendingSync,
         syncOperation = syncOperation
     )

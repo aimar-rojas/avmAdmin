@@ -18,5 +18,6 @@ data class Party(
     val lastName: String? = null,
     val dni: String? = null,
     val ruc: String? = null,
-    val phone: String? = null
+    val phone: String? = null,
+    val accountNumber: String? = null
 ) : Parcelable

@@ -37,7 +37,8 @@ class PartiesRepositoryImpl @Inject constructor(
         lastName: String?,
         dni: String?,
         ruc: String?,
-        phone: String?
+        phone: String?,
+        accountNumber: String?
     ): Result<PartiesResult> {
         try {
             val pendingParties = partyDao.getPendingSyncParties()
@@ -67,6 +68,7 @@ class PartiesRepositoryImpl @Inject constructor(
                                 dni = it.dni,
                                 ruc = it.ruc,
                                 phone = it.phone,
+                                accountNumber = it.accountNumber,
                                 isPendingSync = false,
                                 syncOperation = null
                             )
@@ -82,7 +84,7 @@ class PartiesRepositoryImpl @Inject constructor(
             // Ignore network errors, fall back to DB
         }
         
-        return fetchFromLocalDB(partyRole, firstName, lastName, dni, ruc, phone)
+        return fetchFromLocalDB(partyRole, firstName, lastName, dni, ruc, phone, accountNumber)
     }
 
     private suspend fun fetchFromLocalDB(
@@ -91,7 +93,8 @@ class PartiesRepositoryImpl @Inject constructor(
         lastName: String?,
         dni: String?,
         ruc: String?,
-        phone: String?
+        phone: String?,
+        accountNumber: String?
     ): Result<PartiesResult> {
         return try {
             val allLocalParties = partyDao.getParties().first()
@@ -101,7 +104,8 @@ class PartiesRepositoryImpl @Inject constructor(
                 (lastName == null || party.lastName?.contains(lastName, ignoreCase = true) == true) &&
                 (dni == null || party.dni?.contains(dni) == true) &&
                 (ruc == null || party.ruc?.contains(ruc) == true) &&
-                (phone == null || party.phone?.contains(phone) == true)
+                (phone == null || party.phone?.contains(phone) == true) &&
+                (accountNumber == null || party.accountNumber?.contains(accountNumber) == true)
             }
             val mapped = filtered.map { it.toDomain() }
             Result.success(PartiesResult(parties = mapped, total = mapped.size))
@@ -117,7 +121,8 @@ class PartiesRepositoryImpl @Inject constructor(
         lastName: String?,
         dni: String?,
         ruc: String?,
-        phone: String?
+        phone: String?,
+        accountNumber: String?
     ): Result<Party> {
         return try {
             val tempId = -(System.currentTimeMillis() % Int.MAX_VALUE).toInt()
@@ -130,6 +135,7 @@ class PartiesRepositoryImpl @Inject constructor(
                 dni = dni,
                 ruc = ruc,
                 phone = phone,
+                accountNumber = accountNumber,
                 isPendingSync = true,
                 syncOperation = "CREATE"
             )
@@ -150,10 +156,16 @@ class PartiesRepositoryImpl @Inject constructor(
         lastName: String?,
         dni: String?,
         ruc: String?,
-        phone: String?
+        phone: String?,
+        accountNumber: String?
     ): Result<Party> {
         return try {
-            val existing = partyDao.getPartyById(id)
+            var existing = partyDao.getPartyById(id)
+            if (existing == null && id < 0 && aliasName != null) {
+                // El party se sincronizó en background y cambió su ID negativo temporal a uno real positivo.
+                val all = partyDao.getParties().first()
+                existing = all.find { it.aliasName == aliasName && it.partyRole == partyRole }
+            }
             if (existing != null) {
                 val updatedLocal = existing.copy(
                     partyRole = partyRole ?: existing.partyRole,
@@ -163,6 +175,7 @@ class PartiesRepositoryImpl @Inject constructor(
                     dni = dni ?: existing.dni,
                     ruc = ruc ?: existing.ruc,
                     phone = phone ?: existing.phone,
+                    accountNumber = accountNumber ?: existing.accountNumber,
                     isPendingSync = true,
                     syncOperation = if (existing.partyId <= 0) "CREATE" else "UPDATE"
                 )

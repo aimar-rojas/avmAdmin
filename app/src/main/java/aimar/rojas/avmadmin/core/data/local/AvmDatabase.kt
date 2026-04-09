@@ -23,7 +23,7 @@ import androidx.room.TypeConverters
         ShipmentEntity::class,
         TradeEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

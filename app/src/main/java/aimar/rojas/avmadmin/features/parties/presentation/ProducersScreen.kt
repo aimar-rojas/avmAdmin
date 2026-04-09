@@ -27,6 +27,9 @@ import androidx.navigation.NavController
 import aimar.rojas.avmadmin.domain.model.Party
 import aimar.rojas.avmadmin.features.parties.presentation.components.CreatePartyDialog
 import aimar.rojas.avmadmin.features.parties.presentation.components.PartyCreateUiState
+import aimar.rojas.avmadmin.features.parties.presentation.components.EditPartyBottomSheet
+import aimar.rojas.avmadmin.features.parties.presentation.components.PartyEditUiState
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.text.font.FontWeight
@@ -127,7 +130,10 @@ fun ProducersScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(uiState.parties) { party ->
-                                PartyCard(party = party)
+                                PartyCard(
+                                    party = party,
+                                    onClick = { viewModel.showEditBottomSheet(party) }
+                                )
                             }
                         }
                     }
@@ -141,21 +147,31 @@ fun ProducersScreen(
                 partyRole = "producer",
                 onDismiss = { viewModel.hideCreateDialog() },
                 onAliasNameChange = { viewModel.onAliasNameChange(it) },
-                onFirstNameChange = { viewModel.onFirstNameChange(it) },
-                onLastNameChange = { viewModel.onLastNameChange(it) },
-                onDniChange = { viewModel.onDniChange(it) },
-                onRucChange = { viewModel.onRucChange(it) },
-                onPhoneChange = { viewModel.onPhoneChange(it) },
                 onCreate = { viewModel.createParty() }
+            )
+        }
+
+        if (uiState.showEditBottomSheet) {
+            EditPartyBottomSheet(
+                uiState = uiState.editState,
+                onDismiss = { viewModel.hideEditBottomSheet() },
+                onAliasNameChange = { viewModel.onEditAliasNameChange(it) },
+                onFirstNameChange = { viewModel.onEditFirstNameChange(it) },
+                onLastNameChange = { viewModel.onEditLastNameChange(it) },
+                onDniChange = { viewModel.onEditDniChange(it) },
+                onRucChange = { viewModel.onEditRucChange(it) },
+                onPhoneChange = { viewModel.onEditPhoneChange(it) },
+                onAccountNumberChange = { viewModel.onEditAccountNumberChange(it) },
+                onSave = { viewModel.updateParty() }
             )
         }
     }
 }
 
 @Composable
-private fun PartyCard(party: Party) {
+private fun PartyCard(party: Party, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -194,7 +210,9 @@ data class PartiesUiState(
     val error: String? = null,
     val total: Int = 0,
     val showCreateDialog: Boolean = false,
-    val createState: PartyCreateUiState = PartyCreateUiState()
+    val createState: PartyCreateUiState = PartyCreateUiState(),
+    val showEditBottomSheet: Boolean = false,
+    val editState: PartyEditUiState = PartyEditUiState()
 )
 
 @HiltViewModel
@@ -247,34 +265,52 @@ class ProducersViewModel @Inject constructor(
         )
     }
 
-    fun onFirstNameChange(firstName: String) {
+    fun onEditAliasNameChange(value: String) {
+        _uiState.value = _uiState.value.copy(editState = _uiState.value.editState.copy(aliasName = value))
+    }
+
+    fun onEditFirstNameChange(value: String) {
+        _uiState.value = _uiState.value.copy(editState = _uiState.value.editState.copy(firstName = value))
+    }
+
+    fun onEditLastNameChange(value: String) {
+        _uiState.value = _uiState.value.copy(editState = _uiState.value.editState.copy(lastName = value))
+    }
+
+    fun onEditDniChange(value: String) {
+        _uiState.value = _uiState.value.copy(editState = _uiState.value.editState.copy(dni = value))
+    }
+
+    fun onEditRucChange(value: String) {
+        _uiState.value = _uiState.value.copy(editState = _uiState.value.editState.copy(ruc = value))
+    }
+
+    fun onEditPhoneChange(value: String) {
+        _uiState.value = _uiState.value.copy(editState = _uiState.value.editState.copy(phone = value))
+    }
+
+    fun onEditAccountNumberChange(value: String) {
+        _uiState.value = _uiState.value.copy(editState = _uiState.value.editState.copy(accountNumber = value))
+    }
+
+    fun showEditBottomSheet(party: Party) {
         _uiState.value = _uiState.value.copy(
-            createState = _uiState.value.createState.copy(firstName = firstName)
+            showEditBottomSheet = true,
+            editState = PartyEditUiState(
+                id = party.partyId,
+                aliasName = party.aliasName ?: "",
+                firstName = party.firstName,
+                lastName = party.lastName ?: "",
+                dni = party.dni ?: "",
+                ruc = party.ruc ?: "",
+                phone = party.phone ?: "",
+                accountNumber = party.accountNumber ?: ""
+            )
         )
     }
 
-    fun onLastNameChange(lastName: String) {
-        _uiState.value = _uiState.value.copy(
-            createState = _uiState.value.createState.copy(lastName = lastName)
-        )
-    }
-
-    fun onDniChange(dni: String) {
-        _uiState.value = _uiState.value.copy(
-            createState = _uiState.value.createState.copy(dni = dni)
-        )
-    }
-
-    fun onRucChange(ruc: String) {
-        _uiState.value = _uiState.value.copy(
-            createState = _uiState.value.createState.copy(ruc = ruc)
-        )
-    }
-
-    fun onPhoneChange(phone: String) {
-        _uiState.value = _uiState.value.copy(
-            createState = _uiState.value.createState.copy(phone = phone)
-        )
+    fun hideEditBottomSheet() {
+        _uiState.value = _uiState.value.copy(showEditBottomSheet = false)
     }
 
     fun createParty() {
@@ -288,12 +324,7 @@ class ProducersViewModel @Inject constructor(
 
             partiesRepository.createParty(
                 partyRole = "producer",
-                aliasName = createState.aliasName.takeIf { it.isNotBlank() },
-                firstName = createState.firstName.takeIf { it.isNotBlank() },
-                lastName = createState.lastName.takeIf { it.isNotBlank() },
-                dni = createState.dni.takeIf { it.isNotBlank() },
-                ruc = createState.ruc.takeIf { it.isNotBlank() },
-                phone = createState.phone.takeIf { it.isNotBlank() }
+                aliasName = createState.aliasName.takeIf { it.isNotBlank() }
             )
                 .onSuccess {
                     _uiState.value = currentState.copy(
@@ -309,6 +340,50 @@ class ProducersViewModel @Inject constructor(
                             error = exception.message ?: "Error al crear productor"
                         )
                     )
+                }
+        }
+    }
+
+    fun updateParty() {
+        val st = _uiState.value.editState
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                editState = st.copy(isLoading = true, error = null)
+            )
+
+            partiesRepository.updateParty(
+                id = st.id,
+                partyRole = "producer",
+                aliasName = st.aliasName.takeIf { it.isNotBlank() },
+                firstName = st.firstName.takeIf { it.isNotBlank() },
+                lastName = st.lastName.takeIf { it.isNotBlank() },
+                dni = st.dni.takeIf { it.isNotBlank() },
+                ruc = st.ruc.takeIf { it.isNotBlank() },
+                phone = st.phone.takeIf { it.isNotBlank() },
+                accountNumber = st.accountNumber.takeIf { it.isNotBlank() }
+            )
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        showEditBottomSheet = false,
+                        editState = PartyEditUiState()
+                    )
+                    loadProducers()
+                }
+                .onFailure { exception ->
+                    val errorMsg = if (exception.message == "Party not found locally") {
+                         "El productor fue sincronizado. Se ha recargado la lista."
+                    } else exception.message ?: "Error al actualizar"
+                    
+                    _uiState.value = _uiState.value.copy(
+                        editState = st.copy(
+                            isLoading = false,
+                            error = errorMsg
+                        )
+                    )
+                    
+                    if (exception.message == "Party not found locally") {
+                        loadProducers()
+                    }
                 }
         }
     }

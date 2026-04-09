@@ -11,12 +11,20 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
+
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE parties ADD COLUMN accountNumber TEXT")
+        }
+    }
 
     @Provides
     @Singleton
@@ -25,7 +33,8 @@ object DatabaseModule {
             context,
             AvmDatabase::class.java,
             "avm_database"
-        ).fallbackToDestructiveMigration()
+        ).addMigrations(MIGRATION_4_5)
+         .fallbackToDestructiveMigration()
          .build()
     }
 

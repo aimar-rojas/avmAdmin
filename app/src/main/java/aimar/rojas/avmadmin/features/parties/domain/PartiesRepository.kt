@@ -10,7 +10,8 @@ interface PartiesRepository {
         lastName: String? = null,
         dni: String? = null,
         ruc: String? = null,
-        phone: String? = null
+        phone: String? = null,
+        accountNumber: String? = null
     ): Result<PartiesResult>
 
     suspend fun createParty(
@@ -20,7 +21,8 @@ interface PartiesRepository {
         lastName: String? = null,
         dni: String? = null,
         ruc: String? = null,
-        phone: String? = null
+        phone: String? = null,
+        accountNumber: String? = null
     ): Result<Party>
 
     suspend fun updateParty(
@@ -31,7 +33,8 @@ interface PartiesRepository {
         lastName: String? = null,
         dni: String? = null,
         ruc: String? = null,
-        phone: String? = null
+        phone: String? = null,
+        accountNumber: String? = null
     ): Result<Party>
 }
 
