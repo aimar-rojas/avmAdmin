@@ -81,7 +81,7 @@ class TradeSelectionsViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             val result = selectionsRepository.getSelections(tradeId = tradeId)
             result.onSuccess { selections ->
-                val totalW = selections.sumOf { s -> s.unitWeights.sumOf { it.weight * it.amount } }
+                val totalW = selections.sumOf { s -> s.unitWeights.sumOf { it.weight } }
                 val totalA = selections.sumOf { s -> s.unitWeights.sumOf { it.amount } }
                 
                 _uiState.update { it.copy(
@@ -172,7 +172,7 @@ class TradeSelectionsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = selectionsRepository.getLocalSelections(tradeId)
             result.onSuccess { selections ->
-                val totalW = selections.sumOf { s -> s.unitWeights.sumOf { it.weight * it.amount } }
+                val totalW = selections.sumOf { s -> s.unitWeights.sumOf { it.weight } }
                 val totalA = selections.sumOf { s -> s.unitWeights.sumOf { it.amount } }
                 
                 _uiState.update { it.copy(

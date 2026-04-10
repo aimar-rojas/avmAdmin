@@ -408,6 +408,7 @@ fun UnitWeightInputForm(
 
 @Composable
 fun UnitWeightItem(unitWeight: UnitWeightDetail, accentColor: Color) {
+    val pesoPerJaba = if (unitWeight.amount > 0) unitWeight.weight / unitWeight.amount else 0.0
     Surface(
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -420,20 +421,27 @@ fun UnitWeightItem(unitWeight: UnitWeightDetail, accentColor: Color) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = String.format(Locale.getDefault(), "%.2f kg", unitWeight.weight),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = " ÷ ${unitWeight.amount} jabas",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Text(
-                    text = "${unitWeight.weight} kg",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = " x ${unitWeight.amount} jabas",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = String.format(Locale.getDefault(), "%.2f kg/jaba", pesoPerJaba),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                text = String.format(Locale.getDefault(), "%.2f kg", unitWeight.weight * unitWeight.amount),
+                text = String.format(Locale.getDefault(), "%.2f kg", unitWeight.weight),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
                 color = if (accentColor == Color(0xFFE0E0E0)) Color.Black else accentColor
