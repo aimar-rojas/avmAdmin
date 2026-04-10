@@ -225,6 +225,12 @@ class ShipmentsDetailViewModel @Inject constructor(
 
     fun syncTrade(tradeId: Int) {
         viewModelScope.launch {
+            if (tradeId <= 0) {
+                selectionsRepository.enqueueSyncWorker()
+                _uiState.update { it.copy(error = "El negocio aún está offline. Se ha puesto en cola para sincronización automática.") }
+                return@launch
+            }
+
             _uiState.update { it.copy(isLoading = true, error = null) }
             val result = selectionsRepository.syncAllSelectionsForTrade(tradeId)
             result.onSuccess {

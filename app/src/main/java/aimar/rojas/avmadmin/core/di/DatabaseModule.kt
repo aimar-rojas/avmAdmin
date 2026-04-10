@@ -2,6 +2,7 @@ package aimar.rojas.avmadmin.core.di
 
 import aimar.rojas.avmadmin.core.data.local.AvmDatabase
 import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
+import aimar.rojas.avmadmin.core.data.local.dao.IdMappingDao
 import aimar.rojas.avmadmin.features.parties.data.local.PartyDao
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentDao
 import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
@@ -26,6 +27,14 @@ object DatabaseModule {
         }
     }
 
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `id_mappings` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `entityType` TEXT NOT NULL, `oldId` INTEGER NOT NULL, `newId` INTEGER NOT NULL)"
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun provideAvmDatabase(@ApplicationContext context: Context): AvmDatabase {
@@ -33,7 +42,7 @@ object DatabaseModule {
             context,
             AvmDatabase::class.java,
             "avm_database"
-        ).addMigrations(MIGRATION_4_5)
+        ).addMigrations(MIGRATION_4_5, MIGRATION_5_6)
          .fallbackToDestructiveMigration()
          .build()
     }
@@ -60,5 +69,11 @@ object DatabaseModule {
     @Singleton
     fun provideTradeDao(database: AvmDatabase): TradeDao {
         return database.tradeDao
+    }
+
+    @Provides
+    @Singleton
+    fun provideIdMappingDao(database: AvmDatabase): IdMappingDao {
+        return database.idMappingDao
     }
 }

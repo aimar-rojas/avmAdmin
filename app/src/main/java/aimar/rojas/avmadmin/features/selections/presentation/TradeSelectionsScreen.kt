@@ -236,10 +236,11 @@ private fun getSelectionColor(id: Int): Color {
         1 -> Color.Black      // Sin pita
         2 -> Color(0xFF4CAF50) // Verde
         3 -> Color(0xFFE0E0E0) // Blanco (Gris claro para visibilidad)
-        4 -> Color(0xFFF44336) // Rojo
-        5 -> Color(0xFF2196F3) // Azul
-        6 -> Color(0xFF9C27B0) // Morado
-        7 -> Color(0xFFFFEB3B) // Amarillo
+        4 -> Color(0xFFE91E63) // Rosado
+        5 -> Color(0xFFFF9800) // Naranja
+        6 -> Color(0xFF2196F3) // Azul
+        7 -> Color(0xFF9C27B0) // Morado
+        8 -> Color(0xFFFFEB3B) // Amarillo
         else -> Color.Black
     }
 }

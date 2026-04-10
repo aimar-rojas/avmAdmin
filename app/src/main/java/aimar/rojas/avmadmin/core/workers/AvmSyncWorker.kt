@@ -12,6 +12,9 @@ import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
 import aimar.rojas.avmadmin.features.trades.data.TradesApiService
 import aimar.rojas.avmadmin.features.trades.data.CreateTradeRequest
 
+import aimar.rojas.avmadmin.core.data.local.dao.IdMappingDao
+import aimar.rojas.avmadmin.core.data.local.entities.IdMappingEntity
+
 import aimar.rojas.avmadmin.features.selections.domain.SelectionsRepository
 import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
 
@@ -38,7 +41,8 @@ class AvmSyncWorker @AssistedInject constructor(
     private val tradeApi: TradesApiService,
     private val selectionsRepo: SelectionsRepository,
     private val selectionDao: SelectionDao,
-    private val sessionDataStore: aimar.rojas.avmadmin.data.local.SessionDataStore
+    private val sessionDataStore: aimar.rojas.avmadmin.data.local.SessionDataStore,
+    private val idMappingDao: IdMappingDao
 ) : CoroutineWorker(appContext, workerParams) {
 
     private val dateOnlyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
@@ -78,6 +82,7 @@ class AvmSyncWorker @AssistedInject constructor(
                 val res = partyApi.createParty(req)
                 if (res.isSuccessful && res.body() != null) {
                     val remoteId = res.body()!!.party.partyId
+                    idMappingDao.insertMapping(IdMappingEntity(entityType = "PARTY", oldId = local.partyId, newId = remoteId))
                     tradeDao.updateForeignPartyId(local.partyId, remoteId)
                     partyDao.updatePartyIdAndMarkSynced(local.partyId, remoteId) 
                 } else {
@@ -99,6 +104,7 @@ class AvmSyncWorker @AssistedInject constructor(
                 val res = shipmentApi.createShipment(req)
                 if (res.isSuccessful && res.body() != null) {
                     val remoteId = res.body()!!.shipment.shipmentId
+                    idMappingDao.insertMapping(IdMappingEntity(entityType = "SHIPMENT", oldId = local.shipmentId, newId = remoteId))
                     tradeDao.updateForeignShipmentId(local.shipmentId, remoteId)
                     shipmentDao.updateShipmentIdAndMarkSynced(local.shipmentId, remoteId)
                 } else {
@@ -124,6 +130,7 @@ class AvmSyncWorker @AssistedInject constructor(
                 val res = tradeApi.createTrade(req)
                 if (res.isSuccessful && res.body() != null) {
                     val remoteId = res.body()!!.trade.tradeId
+                    idMappingDao.insertMapping(IdMappingEntity(entityType = "TRADE", oldId = local.tradeId, newId = remoteId))
                     selectionDao.updateForeignTradeId(local.tradeId, remoteId)
                     tradeDao.updateTradeIdAndMarkSynced(local.tradeId, remoteId)
                     sessionDataStore.emitTradeIdMapping(local.tradeId, remoteId)

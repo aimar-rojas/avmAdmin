@@ -1,14 +1,27 @@
 package aimar.rojas.avmadmin.features.selections.data
 
+import aimar.rojas.avmadmin.core.data.local.dao.IdMappingDao
 import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
 import aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionWithUnitWeights
 import aimar.rojas.avmadmin.features.selections.domain.SelectionsRepository
 import aimar.rojas.avmadmin.features.selections.domain.model.SelectionDetail
+import aimar.rojas.avmadmin.core.workers.AvmSyncWorker
+import android.content.Context
+import android.util.Log
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkManager
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 class SelectionsRepositoryImpl @Inject constructor(
     private val api: SelectionsApiService,
-    private val dao: SelectionDao
+    private val dao: SelectionDao,
+    private val idMappingDao: IdMappingDao,
+    @ApplicationContext private val context: Context
 ) : SelectionsRepository {
 
     override suspend fun getSelections(
@@ -80,10 +93,18 @@ class SelectionsRepositoryImpl @Inject constructor(
     }
 
     override suspend fun saveSelectionLocal(selection: SelectionDetail) {
+        var finalTradeId = selection.selectionByTradeId
+        if (finalTradeId < 0) {
+            val mappedTradeId = idMappingDao.getNewId("TRADE", finalTradeId)
+            if (mappedTradeId != null) finalTradeId = mappedTradeId
+        }
+        
+        val updatedSelection = selection.copy(selectionByTradeId = finalTradeId)
+
         dao.saveSelectionWithUnitWeights(
             SelectionWithUnitWeights(
-                selection = selection.toEntity(),
-                unitWeights = selection.unitWeights.map { it.toEntity(selection.selectionByTradeId) }
+                selection = updatedSelection.toEntity(),
+                unitWeights = updatedSelection.unitWeights.map { it.toEntity(updatedSelection.selectionByTradeId) }
             )
         )
     }
@@ -137,6 +158,24 @@ class SelectionsRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    override fun enqueueSyncWorker() {
+        Log.d("AvmAdminSync", "enqueueSyncWorker() triggered in SelectionsRepositoryImpl")
+        try {
+            val workRequest = OneTimeWorkRequestBuilder<AvmSyncWorker>()
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                "SyncWork",
+                ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
+            Log.d("AvmAdminSync", "Worker successfully enqueued to system!")
+        } catch (e: Exception) {
+            Log.e("AvmAdminSync", "Error enqueuing worker", e)
         }
     }
 }

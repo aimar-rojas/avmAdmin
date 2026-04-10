@@ -5,6 +5,7 @@ import aimar.rojas.avmadmin.data.local.SessionDataStore
 import aimar.rojas.avmadmin.domain.model.Trade
 import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
 import aimar.rojas.avmadmin.features.trades.data.local.entities.TradeEntity
+import aimar.rojas.avmadmin.core.data.local.dao.IdMappingDao
 import aimar.rojas.avmadmin.features.trades.domain.TradesRepository
 import aimar.rojas.avmadmin.features.trades.domain.TradesResult
 import android.content.Context
@@ -29,6 +30,7 @@ class TradesRepositoryImpl @Inject constructor(
     private val tradesApiService: TradesApiService,
     private val tradeDao: TradeDao,
     private val sessionDataStore: SessionDataStore,
+    private val idMappingDao: IdMappingDao,
     @ApplicationContext private val context: Context
 ) : TradesRepository {
 
@@ -127,11 +129,24 @@ class TradesRepositoryImpl @Inject constructor(
         return try {
             val tempId = -(System.currentTimeMillis() % Int.MAX_VALUE).toInt()
             
+            // Race condition intercept
+            var finalPartyId = partyId
+            if (partyId < 0) {
+                val mappedPartyId = idMappingDao.getNewId("PARTY", partyId)
+                if (mappedPartyId != null) finalPartyId = mappedPartyId
+            }
+            
+            var finalShipmentId = shipmentId
+            if (shipmentId < 0) {
+                val mappedShipmentId = idMappingDao.getNewId("SHIPMENT", shipmentId)
+                if (mappedShipmentId != null) finalShipmentId = mappedShipmentId
+            }
+
             val localTrade = TradeEntity(
                 tradeId = tempId,
-                partyId = partyId,
+                partyId = finalPartyId,
                 bossId = 0, // DTO doesn't require boss_id in CreateTradeRequest so we set 0
-                shipmentId = shipmentId,
+                shipmentId = finalShipmentId,
                 tradeType = tradeType,
                 startDatetime = startDatetime,
                 endDatetime = endDatetime,

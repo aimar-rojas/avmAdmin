@@ -11,6 +11,9 @@ import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentEntit
 import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
 import aimar.rojas.avmadmin.features.trades.data.local.entities.TradeEntity
 
+import aimar.rojas.avmadmin.core.data.local.dao.IdMappingDao
+import aimar.rojas.avmadmin.core.data.local.entities.IdMappingEntity
+
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
@@ -21,9 +24,10 @@ import androidx.room.TypeConverters
         UnitWeightEntity::class,
         PartyEntity::class,
         ShipmentEntity::class,
-        TradeEntity::class
+        TradeEntity::class,
+        IdMappingEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -32,4 +36,5 @@ abstract class AvmDatabase : RoomDatabase() {
     abstract val partyDao: PartyDao
     abstract val shipmentDao: ShipmentDao
     abstract val tradeDao: TradeDao
+    abstract val idMappingDao: IdMappingDao
 }

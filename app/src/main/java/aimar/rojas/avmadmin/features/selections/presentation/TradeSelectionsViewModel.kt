@@ -22,7 +22,7 @@ data class TradeSelectionsUiState(
     val amountInput: String = "",
     val totalWeight: Double = 0.0,
     val totalAmount: Int = 0,
-    val visibleSelectionTypeIds: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7),
+    val visibleSelectionTypeIds: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7, 8),
     val showSelectionManagerDialog: Boolean = false
 )
 
@@ -47,10 +47,11 @@ class TradeSelectionsViewModel @Inject constructor(
         SelectionTypeInfo(1, "Sin pita"),
         SelectionTypeInfo(2, "Verde"),
         SelectionTypeInfo(3, "Blanco"),
-        SelectionTypeInfo(4, "Rojo"),
-        SelectionTypeInfo(5, "Azul"),
-        SelectionTypeInfo(6, "Morado"),
-        SelectionTypeInfo(7, "Amarillo")
+        SelectionTypeInfo(4, "Rosado"),
+        SelectionTypeInfo(5, "Naranja"),
+        SelectionTypeInfo(6, "Azul"),
+        SelectionTypeInfo(7, "Morado"),
+        SelectionTypeInfo(8, "Amarillo")
     )
 
     init {

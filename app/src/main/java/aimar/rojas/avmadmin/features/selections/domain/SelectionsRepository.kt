@@ -13,4 +13,5 @@ interface SelectionsRepository {
     fun getPendingSyncTradeIds(): kotlinx.coroutines.flow.Flow<List<Int>>
     suspend fun getPendingSyncTradeIdsList(): List<Int>
     suspend fun syncAllSelectionsForTrade(tradeId: Int): Result<Unit>
+    fun enqueueSyncWorker()
 }
