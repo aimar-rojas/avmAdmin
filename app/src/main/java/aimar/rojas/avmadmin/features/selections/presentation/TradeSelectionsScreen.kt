@@ -649,8 +649,8 @@ fun TradeSelectionsPreview() {
                         price = 15.5,
                         selectionTypeName = "Verde",
                         unitWeights = listOf(
-                            UnitWeightDetail(1, 18.5, 10),
-                            UnitWeightDetail(2, 19.0, 5)
+                            UnitWeightDetail(unitWeightId = 1, weight = 18.5, amount = 10),
+                            UnitWeightDetail(unitWeightId = 2, weight = 19.0, amount = 5)
                         )
                     )
                 )

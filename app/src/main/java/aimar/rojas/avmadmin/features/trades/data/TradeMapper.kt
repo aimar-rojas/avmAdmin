@@ -5,6 +5,7 @@ import aimar.rojas.avmadmin.domain.model.Trade
 fun TradeDto.toDomain(): Trade {
     return Trade(
         tradeId = tradeId,
+        remoteId = tradeId,
         partyId = partyId,
         bossId = bossId,
         shipmentId = shipmentId,

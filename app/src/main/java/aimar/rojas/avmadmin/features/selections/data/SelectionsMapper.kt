@@ -6,18 +6,21 @@ import aimar.rojas.avmadmin.features.selections.domain.model.UnitWeightDetail
 fun SelectionByTradeDto.toDomain(): SelectionDetail {
     return SelectionDetail(
         selectionByTradeId = this.selectionByTradeId,
+        remoteId = this.selectionByTradeId,
         tradeId = this.tradeId,
         selectionTypeId = this.selectionTypeId,
         price = this.price?.toDoubleOrNull(),
         unitWeights = this.unitWeights?.map { it.toDomain() } ?: emptyList(),
         selectionTypeName = this.selectionType?.nameSelection,
-        isPendingSync = false // From API it's never pending sync initially
+        isPendingSync = false,
+        syncState = aimar.rojas.avmadmin.core.sync.SyncState.CLEAN
     )
 }
 
 fun UnitWeightDto.toDomain(): UnitWeightDetail {
     return UnitWeightDetail(
         unitWeightId = this.unitWeightId,
+        remoteId = this.unitWeightId,
         weight = this.weight.toDoubleOrNull() ?: 0.0,
         amount = this.amount
     )
@@ -26,19 +29,22 @@ fun UnitWeightDto.toDomain(): UnitWeightDetail {
 // Room to Domain
 fun aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionWithUnitWeights.toDomain(): SelectionDetail {
     return SelectionDetail(
-        selectionByTradeId = this.selection.selectionByTradeId,
-        tradeId = this.selection.tradeId,
+        selectionByTradeId = this.selection.localId,
+        remoteId = this.selection.remoteId,
+        tradeId = this.selection.tradeLocalId,
         selectionTypeId = this.selection.selectionTypeId,
         price = this.selection.price,
         unitWeights = this.unitWeights.map { it.toDomain() },
         selectionTypeName = this.selection.selectionTypeName,
-        isPendingSync = this.selection.isPendingSync
+        isPendingSync = this.selection.syncState != aimar.rojas.avmadmin.core.sync.SyncState.CLEAN,
+        syncState = this.selection.syncState
     )
 }
 
 fun aimar.rojas.avmadmin.features.selections.data.local.entities.UnitWeightEntity.toDomain(): UnitWeightDetail {
     return UnitWeightDetail(
-        unitWeightId = this.unitWeightId,
+        unitWeightId = this.localId,
+        remoteId = this.remoteId,
         weight = this.weight,
         amount = this.amount
     )
@@ -47,19 +53,21 @@ fun aimar.rojas.avmadmin.features.selections.data.local.entities.UnitWeightEntit
 // Domain to Room
 fun SelectionDetail.toEntity(): aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionEntity {
     return aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionEntity(
-        selectionByTradeId = this.selectionByTradeId,
-        tradeId = this.tradeId,
+        localId = this.selectionByTradeId,
+        remoteId = this.remoteId,
+        tradeLocalId = this.tradeId,
         selectionTypeId = this.selectionTypeId,
         price = this.price,
         selectionTypeName = this.selectionTypeName,
-        isPendingSync = this.isPendingSync
+        syncState = this.syncState ?: if (this.isPendingSync) aimar.rojas.avmadmin.core.sync.SyncState.PENDING_UPDATE else aimar.rojas.avmadmin.core.sync.SyncState.CLEAN
     )
 }
 
-fun UnitWeightDetail.toEntity(selectionByTradeId: Int): aimar.rojas.avmadmin.features.selections.data.local.entities.UnitWeightEntity {
+fun UnitWeightDetail.toEntity(selectionLocalId: Int): aimar.rojas.avmadmin.features.selections.data.local.entities.UnitWeightEntity {
     return aimar.rojas.avmadmin.features.selections.data.local.entities.UnitWeightEntity(
-        unitWeightId = this.unitWeightId, // 0 if it's new
-        selectionByTradeId = selectionByTradeId,
+        localId = this.unitWeightId,
+        remoteId = this.remoteId,
+        selectionLocalId = selectionLocalId,
         weight = this.weight,
         amount = this.amount
     )

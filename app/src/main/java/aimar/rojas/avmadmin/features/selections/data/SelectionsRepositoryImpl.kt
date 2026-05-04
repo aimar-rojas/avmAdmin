@@ -1,27 +1,13 @@
 package aimar.rojas.avmadmin.features.selections.data
 
-import aimar.rojas.avmadmin.core.data.local.dao.IdMappingDao
+import aimar.rojas.avmadmin.core.sync.SyncState
 import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
-import aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionWithUnitWeights
 import aimar.rojas.avmadmin.features.selections.domain.SelectionsRepository
 import aimar.rojas.avmadmin.features.selections.domain.model.SelectionDetail
-import aimar.rojas.avmadmin.core.workers.AvmSyncWorker
-import android.content.Context
-import android.util.Log
-import androidx.work.Constraints
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
-import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 class SelectionsRepositoryImpl @Inject constructor(
-    private val api: SelectionsApiService,
-    private val dao: SelectionDao,
-    private val idMappingDao: IdMappingDao,
-    @ApplicationContext private val context: Context
+    private val dao: SelectionDao
 ) : SelectionsRepository {
 
     override suspend fun getSelections(
@@ -29,153 +15,66 @@ class SelectionsRepositoryImpl @Inject constructor(
         selectionTypeId: Int?
     ): Result<List<SelectionDetail>> {
         return try {
-            // First check if there are any pending local syncs for this trade
-            if (tradeId != null) {
-                val pendingSelections = dao.getPendingSelectionsByTradeId(tradeId)
-                if (pendingSelections.isNotEmpty()) {
-                    // We must serve local data to avoid overwriting unsynced modifications
-                    return fetchFromLocalDB(tradeId)
-                }
-            }
-
-            // If no local pending changes, try to fetch from API
-            val response = api.getSelections(tradeId = tradeId, selectionTypeId = selectionTypeId)
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body != null) {
-                    val domainSelections = body.selections.map { it.toDomain() }
-                    
-                    // Delete old local selections before replacing with new remote ones
-                    if (tradeId != null) {
-                        dao.deleteSelectionsByTradeId(tradeId)
-                    }
-                    
-                    // Save to local database
-                    domainSelections.forEach { selection ->
-                        dao.saveSelectionWithUnitWeights(
-                            SelectionWithUnitWeights(
-                                selection = selection.toEntity(),
-                                unitWeights = selection.unitWeights.map { it.toEntity(selection.selectionByTradeId) }
-                            )
-                        )
-                    }
-                    
-                    Result.success(domainSelections)
-                } else {
-                    Result.failure(Exception("Empty body response"))
-                }
+            if (tradeId == null) {
+                Result.failure(Exception("Cannot fetch selections without tradeId"))
             } else {
-                // If network fails, try fetching from local DB
-                fetchFromLocalDB(tradeId)
-            }
-        } catch (e: Exception) {
-            // If exception (no network), try local DB
-            fetchFromLocalDB(tradeId)
-        }
-    }
-
-    override suspend fun getLocalSelections(tradeId: Int): Result<List<SelectionDetail>> {
-        return fetchFromLocalDB(tradeId)
-    }
-
-    private suspend fun fetchFromLocalDB(tradeId: Int?): Result<List<SelectionDetail>> {
-        return try {
-            if (tradeId != null) {
-                val localSelections = dao.getSelectionsByTradeId(tradeId)
-                Result.success(localSelections.map { it.toDomain() })
-            } else {
-                // We don't have a get all query, usually we only fetch by tradeId
-                Result.failure(Exception("Cannot fetch all from local DB without tradeId"))
+                val selections = dao.getSelectionsByTradeId(tradeId)
+                    .map { it.toDomain() }
+                    .filter { selectionTypeId == null || it.selectionTypeId == selectionTypeId }
+                Result.success(selections)
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    override suspend fun saveSelectionLocal(selection: SelectionDetail) {
-        var finalTradeId = selection.selectionByTradeId
-        if (finalTradeId < 0) {
-            val mappedTradeId = idMappingDao.getNewId("TRADE", finalTradeId)
-            if (mappedTradeId != null) finalTradeId = mappedTradeId
-        }
-        
-        val updatedSelection = selection.copy(selectionByTradeId = finalTradeId)
+    override suspend fun getLocalSelections(tradeId: Int): Result<List<SelectionDetail>> {
+        return getSelections(tradeId, null)
+    }
 
-        dao.saveSelectionWithUnitWeights(
-            SelectionWithUnitWeights(
-                selection = updatedSelection.toEntity(),
-                unitWeights = updatedSelection.unitWeights.map { it.toEntity(updatedSelection.selectionByTradeId) }
-            )
+    override suspend fun saveSelectionLocal(selection: SelectionDetail) {
+        val existing = if (selection.selectionByTradeId > 0) {
+            dao.getSelectionWithUnitWeights(selection.selectionByTradeId)
+        } else {
+            null
+        }
+
+        val syncState = when {
+            existing == null -> SyncState.PENDING_CREATE
+            existing.selection.remoteId == null -> SyncState.PENDING_CREATE
+            else -> SyncState.PENDING_UPDATE
+        }
+
+        val localSelection = selection.toEntity().copy(
+            localId = if (selection.selectionByTradeId > 0) selection.selectionByTradeId else 0,
+            remoteId = existing?.selection?.remoteId ?: selection.remoteId,
+            tradeLocalId = selection.tradeId,
+            syncState = syncState,
+            syncError = null
+        )
+
+        val selectionLocalId = if (localSelection.localId == 0) {
+            dao.insertSelection(localSelection).toInt()
+        } else {
+            dao.insertSelection(localSelection)
+            localSelection.localId
+        }
+
+        val previousWeights = existing?.unitWeights?.associateBy { it.localId }.orEmpty()
+        dao.deleteUnitWeightsBySelectionId(selectionLocalId)
+        dao.insertUnitWeights(
+            selection.unitWeights.map { unitWeight ->
+                val previous = previousWeights[unitWeight.unitWeightId]
+                unitWeight.toEntity(selectionLocalId).copy(
+                    localId = if (unitWeight.unitWeightId > 0) unitWeight.unitWeightId else 0,
+                    remoteId = previous?.remoteId ?: unitWeight.remoteId,
+                    selectionLocalId = selectionLocalId
+                )
+            }
         )
     }
 
     override fun getPendingSyncTradeIds(): kotlinx.coroutines.flow.Flow<List<Int>> {
         return dao.getPendingSyncTradeIds()
-    }
-
-    override suspend fun getPendingSyncTradeIdsList(): List<Int> {
-        return dao.getPendingSyncTradeIdsList()
-    }
-
-    override suspend fun syncAllSelectionsForTrade(tradeId: Int): Result<Unit> {
-        if (tradeId <= 0) {
-            return Result.failure(Exception("El Negocio aún no se ha sincronizado (ID offline). Por favor espera la sincronización automática."))
-        }
-        return try {
-            val pendingSelections = dao.getPendingSelectionsByTradeId(tradeId)
-            
-            if (pendingSelections.isEmpty()) {
-                return Result.success(Unit) // Nothing to sync
-            }
-            
-            var allSuccess = true
-            var lastErrorMsg = ""
-
-            for (localData in pendingSelections) {
-                val domainData = localData.toDomain()
-                val requestDto = domainData.toUpdateDto()
-                
-                // If ID is <= 0, it means it was created locally and never synced (needs POST)
-                val response = if (domainData.selectionByTradeId <= 0) {
-                    api.createSelection(requestDto)
-                } else {
-                    api.updateSelection(domainData.selectionByTradeId, requestDto)
-                }
-                
-                if (!response.isSuccessful) {
-                    allSuccess = false
-                    lastErrorMsg = response.errorBody()?.string() ?: "Unknown error"
-                    break
-                }
-            }
-
-            if (allSuccess) {
-                // If all selections for this trade synced successfully, clear the pending flag
-                dao.markTradeSelectionsAsSynced(tradeId)
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception("Error syncing trade $tradeId: $lastErrorMsg"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override fun enqueueSyncWorker() {
-        Log.d("AvmAdminSync", "enqueueSyncWorker() triggered in SelectionsRepositoryImpl")
-        try {
-            val workRequest = OneTimeWorkRequestBuilder<AvmSyncWorker>()
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                "SyncWork",
-                ExistingWorkPolicy.REPLACE,
-                workRequest
-            )
-            Log.d("AvmAdminSync", "Worker successfully enqueued to system!")
-        } catch (e: Exception) {
-            Log.e("AvmAdminSync", "Error enqueuing worker", e)
-        }
     }
 }

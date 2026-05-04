@@ -92,6 +92,61 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Sincronización manual",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Pendientes: ${uiState.syncStatus.summary.totalPending}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                uiState.syncStatus.phase?.let { phase ->
+                    Text(
+                        text = "Fase: $phase",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                uiState.syncStatus.message?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (uiState.syncStatus.state == "error") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                uiState.syncStatus.lastSuccessAt?.let { lastSuccess ->
+                    Text(
+                        text = "Último sync exitoso: $lastSuccess",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (uiState.syncStatus.isRunning) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+                Button(
+                    onClick = { viewModel.syncNow() },
+                    enabled = !uiState.syncStatus.isRunning,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (uiState.syncStatus.isRunning) "Sincronizando..." else "Sincronizar ahora")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         Button(
             onClick = {
                 viewModel.logout {

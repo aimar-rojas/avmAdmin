@@ -6,8 +6,8 @@ import androidx.room.Relation
 data class SelectionWithUnitWeights(
     @Embedded val selection: SelectionEntity,
     @Relation(
-        parentColumn = "selectionByTradeId",
-        entityColumn = "selectionByTradeId"
+        parentColumn = "localId",
+        entityColumn = "selectionLocalId"
     )
     val unitWeights: List<UnitWeightEntity>
 )

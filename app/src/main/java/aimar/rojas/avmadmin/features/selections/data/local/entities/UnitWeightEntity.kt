@@ -10,17 +10,18 @@ import androidx.room.PrimaryKey
     foreignKeys = [
         ForeignKey(
             entity = SelectionEntity::class,
-            parentColumns = ["selectionByTradeId"],
-            childColumns = ["selectionByTradeId"],
+            parentColumns = ["localId"],
+            childColumns = ["selectionLocalId"],
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("selectionByTradeId")]
+    indices = [Index("selectionLocalId"), Index(value = ["remoteId"], unique = true)]
 )
 data class UnitWeightEntity(
     @PrimaryKey(autoGenerate = true)
-    val unitWeightId: Int = 0,
-    val selectionByTradeId: Int, // Changed to val to be immutable, wait, let's keep it straight
+    val localId: Int = 0,
+    val remoteId: Int? = null,
+    val selectionLocalId: Int,
     val weight: Double,
     val amount: Int
 )

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import aimar.rojas.avmadmin.domain.model.Party
 import aimar.rojas.avmadmin.domain.model.Trade
+import aimar.rojas.avmadmin.core.sync.ManualSyncManager
 import aimar.rojas.avmadmin.features.parties.domain.PartiesRepository
 import aimar.rojas.avmadmin.features.trades.domain.TradesRepository
 import aimar.rojas.avmadmin.utils.DateUtils
@@ -12,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -22,6 +24,7 @@ class ShipmentsDetailViewModel @Inject constructor(
     private val tradesRepository: TradesRepository,
     private val partiesRepository: PartiesRepository,
     private val selectionsRepository: aimar.rojas.avmadmin.features.selections.domain.SelectionsRepository,
+    private val manualSyncManager: ManualSyncManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -225,18 +228,13 @@ class ShipmentsDetailViewModel @Inject constructor(
 
     fun syncTrade(tradeId: Int) {
         viewModelScope.launch {
-            if (tradeId <= 0) {
-                selectionsRepository.enqueueSyncWorker()
-                _uiState.update { it.copy(error = "El negocio aún está offline. Se ha puesto en cola para sincronización automática.") }
-                return@launch
-            }
-
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val result = selectionsRepository.syncAllSelectionsForTrade(tradeId)
-            result.onSuccess {
-                _uiState.update { it.copy(isLoading = false) }
-            }.onFailure { error ->
-                _uiState.update { it.copy(isLoading = false, error = error.message ?: "Error sincronizando") }
+            val status = manualSyncManager.syncNow()
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    error = if (status.state == "error") status.message else null
+                )
             }
         }
     }

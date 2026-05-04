@@ -8,6 +8,7 @@ import kotlinx.parcelize.Parcelize
 data class Party(
     @SerializedName("party_id")
     val partyId: Int,
+    val remoteId: Int? = null,
     @SerializedName("party_role")
     val partyRole: String,
     @SerializedName("alias_name")
@@ -19,5 +20,6 @@ data class Party(
     val dni: String? = null,
     val ruc: String? = null,
     val phone: String? = null,
-    val accountNumber: String? = null
+    val accountNumber: String? = null,
+    val syncState: String? = null
 ) : Parcelable

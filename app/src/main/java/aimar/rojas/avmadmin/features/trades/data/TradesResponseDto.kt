@@ -30,7 +30,11 @@ data class TradeDto(
     @SerializedName("shipment")
     val shipment: ShipmentDto? = null,
     @SerializedName("amount_per_trade")
-    val amountPerTrade: Double = 0.0
+    val amountPerTrade: Double = 0.0,
+    @SerializedName("created_at")
+    val createdAt: String? = null,
+    @SerializedName("updated_at")
+    val updatedAt: String? = null
 )
 
 data class BossDto(
@@ -72,6 +76,23 @@ data class CreateTradeRequest(
     val discountWeightPerTray: Double,
     @SerializedName("variety_avocado")
     val varietyAvocado: String
+)
+
+data class UpdateTradeRequest(
+    @SerializedName("party_id")
+    val partyId: Int? = null,
+    @SerializedName("shipment_id")
+    val shipmentId: Int? = null,
+    @SerializedName("trade_type")
+    val tradeType: String? = null,
+    @SerializedName("start_datetime")
+    val startDatetime: String? = null,
+    @SerializedName("end_datetime")
+    val endDatetime: String? = null,
+    @SerializedName("discount_weight_per_tray")
+    val discountWeightPerTray: Double? = null,
+    @SerializedName("variety_avocado")
+    val varietyAvocado: String? = null
 )
 
 data class CreateTradeResponseDto(

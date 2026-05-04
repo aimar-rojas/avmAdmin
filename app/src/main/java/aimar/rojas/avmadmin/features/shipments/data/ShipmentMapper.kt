@@ -7,6 +7,7 @@ import java.util.Date
 fun ShipmentDto.toDomain(): Shipment {
     return Shipment(
         shipmentId = shipmentId,
+        remoteId = shipmentId,
         startDate = DateUtils.parseApiDate(startDate) ?: Date(),
         endDate = DateUtils.parseApiDate(endDate),
         status = status,

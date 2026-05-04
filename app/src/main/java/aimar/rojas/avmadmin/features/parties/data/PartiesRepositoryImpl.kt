@@ -1,93 +1,19 @@
 package aimar.rojas.avmadmin.features.parties.data
 
-import aimar.rojas.avmadmin.core.workers.AvmSyncWorker
-import aimar.rojas.avmadmin.data.local.SessionDataStore
+import aimar.rojas.avmadmin.core.sync.SyncState
 import aimar.rojas.avmadmin.domain.model.Party
 import aimar.rojas.avmadmin.features.parties.data.local.PartyDao
 import aimar.rojas.avmadmin.features.parties.data.local.entities.PartyEntity
 import aimar.rojas.avmadmin.features.parties.domain.PartiesRepository
 import aimar.rojas.avmadmin.features.parties.domain.PartiesResult
-import android.content.Context
-import androidx.work.Constraints
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
-import retrofit2.HttpException
-import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 import javax.inject.Inject
 
 class PartiesRepositoryImpl @Inject constructor(
-    private val partiesApiService: PartiesApiService,
-    private val partyDao: PartyDao,
-    private val sessionDataStore: SessionDataStore,
-    @ApplicationContext private val context: Context
+    private val partyDao: PartyDao
 ) : PartiesRepository {
 
     override suspend fun getParties(
-        partyRole: String?,
-        firstName: String?,
-        lastName: String?,
-        dni: String?,
-        ruc: String?,
-        phone: String?,
-        accountNumber: String?
-    ): Result<PartiesResult> {
-        try {
-            val pendingParties = partyDao.getPendingSyncParties()
-            if (pendingParties.isEmpty()) {
-                val count = partyDao.getPartyCount()
-                val lastSync = if (count == 0) null else sessionDataStore.getLastPartySync()
-                val response = partiesApiService.getParties(
-                    partyRole = partyRole,
-                    firstName = firstName,
-                    lastName = lastName,
-                    dni = dni,
-                    ruc = ruc,
-                    phone = phone,
-                    updatedAfter = lastSync
-                )
-
-                if (response.isSuccessful && response.body() != null) {
-                    val serverParties = response.body()!!.parties
-                    if (serverParties.isNotEmpty()) {
-                        val entities = serverParties.map {
-                            PartyEntity(
-                                partyId = it.partyId,
-                                partyRole = it.partyRole,
-                                aliasName = it.aliasName,
-                                firstName = it.firstName ?: "",
-                                lastName = it.lastName,
-                                dni = it.dni,
-                                ruc = it.ruc,
-                                phone = it.phone,
-                                accountNumber = it.accountNumber,
-                                isPendingSync = false,
-                                syncOperation = null
-                            )
-                        }
-                        partyDao.insertParties(entities)
-                        
-                        val currentTime = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
-                        sessionDataStore.saveLastPartySync(currentTime)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // Ignore network errors, fall back to DB
-        }
-        
-        return fetchFromLocalDB(partyRole, firstName, lastName, dni, ruc, phone, accountNumber)
-    }
-
-    private suspend fun fetchFromLocalDB(
         partyRole: String?,
         firstName: String?,
         lastName: String?,
@@ -100,12 +26,12 @@ class PartiesRepositoryImpl @Inject constructor(
             val allLocalParties = partyDao.getParties().first()
             val filtered = allLocalParties.filter { party ->
                 (partyRole == null || party.partyRole.equals(partyRole, ignoreCase = true)) &&
-                (firstName == null || party.firstName.contains(firstName, ignoreCase = true)) &&
-                (lastName == null || party.lastName?.contains(lastName, ignoreCase = true) == true) &&
-                (dni == null || party.dni?.contains(dni) == true) &&
-                (ruc == null || party.ruc?.contains(ruc) == true) &&
-                (phone == null || party.phone?.contains(phone) == true) &&
-                (accountNumber == null || party.accountNumber?.contains(accountNumber) == true)
+                    (firstName == null || party.firstName.contains(firstName, ignoreCase = true)) &&
+                    (lastName == null || party.lastName?.contains(lastName, ignoreCase = true) == true) &&
+                    (dni == null || party.dni?.contains(dni) == true) &&
+                    (ruc == null || party.ruc?.contains(ruc) == true) &&
+                    (phone == null || party.phone?.contains(phone) == true) &&
+                    (accountNumber == null || party.accountNumber?.contains(accountNumber) == true)
             }
             val mapped = filtered.map { it.toDomain() }
             Result.success(PartiesResult(parties = mapped, total = mapped.size))
@@ -125,9 +51,7 @@ class PartiesRepositoryImpl @Inject constructor(
         accountNumber: String?
     ): Result<Party> {
         return try {
-            val tempId = -(System.currentTimeMillis() % Int.MAX_VALUE).toInt()
             val localParty = PartyEntity(
-                partyId = tempId,
                 partyRole = partyRole,
                 aliasName = aliasName,
                 firstName = firstName ?: "",
@@ -136,13 +60,10 @@ class PartiesRepositoryImpl @Inject constructor(
                 ruc = ruc,
                 phone = phone,
                 accountNumber = accountNumber,
-                isPendingSync = true,
-                syncOperation = "CREATE"
+                syncState = SyncState.PENDING_CREATE
             )
-            partyDao.insertParty(localParty)
-            enqueueSyncWorker()
-            
-            Result.success(localParty.toDomain())
+            val localId = partyDao.insertParty(localParty).toInt()
+            Result.success(partyDao.getPartyById(localId)?.toDomain() ?: localParty.copy(localId = localId).toDomain())
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -160,12 +81,7 @@ class PartiesRepositoryImpl @Inject constructor(
         accountNumber: String?
     ): Result<Party> {
         return try {
-            var existing = partyDao.getPartyById(id)
-            if (existing == null && id < 0 && aliasName != null) {
-                // El party se sincronizó en background y cambió su ID negativo temporal a uno real positivo.
-                val all = partyDao.getParties().first()
-                existing = all.find { it.aliasName == aliasName && it.partyRole == partyRole }
-            }
+            val existing = partyDao.getPartyById(id)
             if (existing != null) {
                 val updatedLocal = existing.copy(
                     partyRole = partyRole ?: existing.partyRole,
@@ -176,11 +92,10 @@ class PartiesRepositoryImpl @Inject constructor(
                     ruc = ruc ?: existing.ruc,
                     phone = phone ?: existing.phone,
                     accountNumber = accountNumber ?: existing.accountNumber,
-                    isPendingSync = true,
-                    syncOperation = if (existing.partyId <= 0) "CREATE" else "UPDATE"
+                    syncState = if (existing.remoteId == null) SyncState.PENDING_CREATE else SyncState.PENDING_UPDATE,
+                    syncError = null
                 )
                 partyDao.insertParty(updatedLocal)
-                enqueueSyncWorker()
                 Result.success(updatedLocal.toDomain())
             } else {
                 Result.failure(Exception("Party not found locally"))
@@ -189,17 +104,4 @@ class PartiesRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
-
-    private fun enqueueSyncWorker() {
-        val workRequest = OneTimeWorkRequestBuilder<AvmSyncWorker>()
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            "SyncWork",
-            ExistingWorkPolicy.REPLACE,
-            workRequest
-        )
-    }
 }
-

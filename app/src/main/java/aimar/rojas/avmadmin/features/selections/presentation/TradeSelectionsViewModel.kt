@@ -34,7 +34,6 @@ data class SelectionTypeInfo(
 @HiltViewModel
 class TradeSelectionsViewModel @Inject constructor(
     private val selectionsRepository: SelectionsRepository,
-    private val sessionDataStore: aimar.rojas.avmadmin.data.local.SessionDataStore,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -56,19 +55,6 @@ class TradeSelectionsViewModel @Inject constructor(
 
     init {
         loadSelections()
-        observeTradeIdMappings()
-    }
-
-    private fun observeTradeIdMappings() {
-        viewModelScope.launch {
-            sessionDataStore.tradeIdMappingFlow.collect { mapping ->
-                if (tradeId == mapping.first) {
-                    tradeId = mapping.second
-                    android.util.Log.d("AvmAdminSync", "ViewModel dynamically swapped Trade ID from ${mapping.first} to ${mapping.second}")
-                    loadSelections()
-                }
-            }
-        }
     }
 
     fun loadSelections() {
@@ -120,7 +106,7 @@ class TradeSelectionsViewModel @Inject constructor(
             if (currentSelection != null) {
                 // Add the new unit weight to the current selection
                 val newUnitWeight = aimar.rojas.avmadmin.features.selections.domain.model.UnitWeightDetail(
-                    unitWeightId = -(System.nanoTime() % 1000000000).toInt(), // unique negative local ID
+                    unitWeightId = 0,
                     weight = weight,
                     amount = amount
                 )
@@ -141,13 +127,13 @@ class TradeSelectionsViewModel @Inject constructor(
             } else {
                 // If the selection doesn't exist yet, we create it
                 val newSelection = aimar.rojas.avmadmin.features.selections.domain.model.SelectionDetail(
-                    selectionByTradeId = -(System.nanoTime() % 1000000000).toInt(), // unique negative local ID
+                    selectionByTradeId = 0,
                     tradeId = tradeId,
                     selectionTypeId = currentState.selectedSelectionTypeId,
                     price = null,
                     unitWeights = listOf(
                         aimar.rojas.avmadmin.features.selections.domain.model.UnitWeightDetail(
-                            unitWeightId = -(System.nanoTime() % 1000000000).toInt(),
+                            unitWeightId = 0,
                             weight = weight,
                             amount = amount
                         )

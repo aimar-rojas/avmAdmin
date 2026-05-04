@@ -9,32 +9,29 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TradeDao {
-    @Query("SELECT * FROM trades WHERE shipmentId = :shipmentId AND (isPendingSync = 0 OR syncOperation != 'DELETE') ORDER BY startDatetime DESC")
+    @Query("SELECT * FROM trades WHERE shipmentLocalId = :shipmentId ORDER BY startDatetime DESC")
     fun getTradesByShipment(shipmentId: Int): Flow<List<TradeEntity>>
 
-    @Query("SELECT * FROM trades WHERE tradeId = :tradeId")
+    @Query("SELECT * FROM trades WHERE shipmentLocalId = :shipmentId ORDER BY startDatetime DESC")
+    suspend fun getTradesByShipmentList(shipmentId: Int): List<TradeEntity>
+
+    @Query("SELECT * FROM trades WHERE localId = :tradeId")
     suspend fun getTradeById(tradeId: Int): TradeEntity?
 
-    @Query("SELECT * FROM trades WHERE isPendingSync = 1")
+    @Query("SELECT * FROM trades WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun getTradeByRemoteId(remoteId: Int): TradeEntity?
+
+    @Query("SELECT * FROM trades WHERE syncState != 'CLEAN' ORDER BY localId ASC")
     suspend fun getPendingSyncTrades(): List<TradeEntity>
 
+    @Query("SELECT COUNT(*) FROM trades WHERE syncState != 'CLEAN'")
+    fun observePendingCount(): Flow<Int>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTrade(trade: TradeEntity)
+    suspend fun insertTrade(trade: TradeEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTrades(trades: List<TradeEntity>)
-
-    @Query("UPDATE trades SET tradeId = :newId, isPendingSync = 0, syncOperation = NULL WHERE tradeId = :oldId")
-    suspend fun updateTradeIdAndMarkSynced(oldId: Int, newId: Int)
-
-    @Query("UPDATE trades SET partyId = :newPartyId WHERE partyId = :oldPartyId")
-    suspend fun updateForeignPartyId(oldPartyId: Int, newPartyId: Int)
-
-    @Query("UPDATE trades SET shipmentId = :newShipmentId WHERE shipmentId = :oldShipmentId")
-    suspend fun updateForeignShipmentId(oldShipmentId: Int, newShipmentId: Int)
-
-    @Query("DELETE FROM trades WHERE isPendingSync = 0")
-    suspend fun clearSyncedTrades()
 
     @Query("SELECT COUNT(*) FROM trades")
     suspend fun getTradeCount(): Int

@@ -17,6 +17,10 @@ data class SelectionByTradeDto(
     val price: String?,
     @SerializedName("unit_weights")
     val unitWeights: List<UnitWeightDto>? = emptyList(),
+    @SerializedName("created_at")
+    val createdAt: String? = null,
+    @SerializedName("updated_at")
+    val updatedAt: String? = null,
     val trade: TradeReferenceDto? = null,
     @SerializedName("selection_type")
     val selectionType: SelectionTypeReferenceDto? = null
@@ -26,7 +30,11 @@ data class UnitWeightDto(
     @SerializedName("unit_weight_id")
     val unitWeightId: Int,
     val weight: String,
-    val amount: Int
+    val amount: Int,
+    @SerializedName("created_at")
+    val createdAt: String? = null,
+    @SerializedName("updated_at")
+    val updatedAt: String? = null
 )
 
 data class TradeReferenceDto(

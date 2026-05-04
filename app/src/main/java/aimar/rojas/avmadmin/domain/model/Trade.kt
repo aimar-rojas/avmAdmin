@@ -8,6 +8,7 @@ import kotlinx.parcelize.Parcelize
 data class Trade(
     @SerializedName("trade_id")
     val tradeId: Int,
+    val remoteId: Int? = null,
     @SerializedName("party_id")
     val partyId: Int,
     @SerializedName("boss_id")
@@ -25,5 +26,6 @@ data class Trade(
     @SerializedName("variety_avocado")
     val varietyAvocado: String,
     @SerializedName("amount_per_trade")
-    val amountPerTrade: Double
+    val amountPerTrade: Double,
+    val syncState: String? = null
 ) : Parcelable

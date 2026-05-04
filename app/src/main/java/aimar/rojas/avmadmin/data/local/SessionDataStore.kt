@@ -12,8 +12,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -36,6 +34,9 @@ class SessionDataStore @Inject constructor(
     private val lastPartySyncKey = stringPreferencesKey("last_party_sync")
     private val lastShipmentSyncKey = stringPreferencesKey("last_shipment_sync")
     private val lastTradeSyncKey = stringPreferencesKey("last_trade_sync")
+    private val lastSelectionSyncKey = stringPreferencesKey("last_selection_sync")
+    private val lastManualSyncAttemptKey = stringPreferencesKey("last_manual_sync_attempt")
+    private val lastManualSyncSuccessKey = stringPreferencesKey("last_manual_sync_success")
     
     suspend fun saveUser(user: User) {
         val userJson = gson.toJson(user)
@@ -124,12 +125,27 @@ class SessionDataStore @Inject constructor(
     suspend fun getLastTradeSync(): String? {
         return dataStore.data.first()[lastTradeSyncKey]
     }
-    
-    // Memory Event Bus for ID Promotions
-    private val _tradeIdMappingFlow = MutableSharedFlow<Pair<Int, Int>>(extraBufferCapacity = 10)
-    val tradeIdMappingFlow = _tradeIdMappingFlow.asSharedFlow()
 
-    fun emitTradeIdMapping(oldId: Int, newId: Int) {
-        _tradeIdMappingFlow.tryEmit(Pair(oldId, newId))
+    suspend fun saveLastSelectionSync(timestamp: String) {
+        dataStore.edit { preferences -> preferences[lastSelectionSyncKey] = timestamp }
+    }
+    suspend fun getLastSelectionSync(): String? {
+        return dataStore.data.first()[lastSelectionSyncKey]
+    }
+
+    suspend fun saveLastManualSyncAttempt(timestamp: String) {
+        dataStore.edit { preferences -> preferences[lastManualSyncAttemptKey] = timestamp }
+    }
+
+    suspend fun getLastManualSyncAttempt(): String? {
+        return dataStore.data.first()[lastManualSyncAttemptKey]
+    }
+
+    suspend fun saveLastManualSyncSuccess(timestamp: String) {
+        dataStore.edit { preferences -> preferences[lastManualSyncSuccessKey] = timestamp }
+    }
+
+    suspend fun getLastManualSyncSuccess(): String? {
+        return dataStore.data.first()[lastManualSyncSuccessKey]
     }
 }
