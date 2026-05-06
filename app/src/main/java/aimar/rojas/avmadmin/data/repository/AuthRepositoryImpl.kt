@@ -14,10 +14,15 @@ import retrofit2.HttpException
 import java.io.IOException
 import javax.inject.Inject
 
+import aimar.rojas.avmadmin.core.data.local.AvmDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 class AuthRepositoryImpl @Inject constructor(
     private val authApiService: AuthApiService,
     private val tokenDataStore: TokenDataStore,
-    private val sessionDataStore: SessionDataStore
+    private val sessionDataStore: SessionDataStore,
+    private val avmDatabase: AvmDatabase
 ) : AuthRepository {
 
     override suspend fun login(email: String, password: String): Result<AuthResponse> {
@@ -83,6 +88,9 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun logout() {
         sessionDataStore.clearSession()
+        withContext(Dispatchers.IO) {
+            avmDatabase.clearAllTables()
+        }
     }
 
     override suspend fun getCurrentToken(): String? {

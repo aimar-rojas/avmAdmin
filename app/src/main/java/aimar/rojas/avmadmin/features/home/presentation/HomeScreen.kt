@@ -13,6 +13,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import aimar.rojas.avmadmin.R
@@ -23,6 +29,20 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    
+    if (uiState.logoutError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearLogoutError() },
+            icon = { Icon(Icons.Filled.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Error al cerrar sesión") },
+            text = { Text(uiState.logoutError!!) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearLogoutError() }) {
+                    Text("Entendido")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -92,55 +112,95 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        val totalPending = uiState.syncStatus.summary.totalPending
+        val isSyncing = uiState.syncStatus.isRunning
+        val hasError = uiState.syncStatus.state == "error"
+        
+        val syncContainerColor = if (hasError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant
+        val syncContentColor = if (hasError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
+        
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            colors = CardDefaults.cardColors(containerColor = syncContainerColor)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "Sincronización manual",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Pendientes: ${uiState.syncStatus.summary.totalPending}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                uiState.syncStatus.phase?.let { phase ->
-                    Text(
-                        text = "Fase: $phase",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val icon = when {
+                            isSyncing -> Icons.Filled.CloudSync
+                            totalPending > 0 -> Icons.Filled.CloudOff
+                            else -> Icons.Filled.CloudDone
+                        }
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = "Estado de Sincronización",
+                            tint = if (totalPending > 0 && !isSyncing) Color(0xFFFFA500) else syncContentColor
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Estado Nube",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = syncContentColor
+                        )
+                    }
+                    if (totalPending > 0) {
+                        Badge(containerColor = MaterialTheme.colorScheme.error) {
+                            Text("$totalPending pendientes", modifier = Modifier.padding(horizontal = 4.dp))
+                        }
+                    } else if (!isSyncing) {
+                        Badge(containerColor = Color(0xFF4CAF50)) {
+                            Text("Sincronizado", modifier = Modifier.padding(horizontal = 4.dp))
+                        }
+                    }
                 }
-                uiState.syncStatus.message?.let { message ->
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (uiState.syncStatus.state == "error") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                
+                if (isSyncing) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    uiState.syncStatus.phase?.let { phase ->
+                        Text(
+                            text = phase,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = syncContentColor
+                        )
+                    }
+                } else {
+                    uiState.syncStatus.message?.let { message ->
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = syncContentColor
+                        )
+                    }
                 }
+                
                 uiState.syncStatus.lastSuccessAt?.let { lastSuccess ->
                     Text(
                         text = "Último sync exitoso: $lastSuccess",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.labelSmall,
+                        color = syncContentColor.copy(alpha = 0.7f)
                     )
                 }
-                if (uiState.syncStatus.isRunning) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                }
+
                 Button(
                     onClick = { viewModel.syncNow() },
-                    enabled = !uiState.syncStatus.isRunning,
-                    modifier = Modifier.fillMaxWidth()
+                    enabled = !isSyncing,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (hasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
                 ) {
-                    Text(if (uiState.syncStatus.isRunning) "Sincronizando..." else "Sincronizar ahora")
+                    Icon(Icons.Filled.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (isSyncing) "Sincronizando..." else if (hasError) "Reintentar" else "Sincronizar ahora")
                 }
             }
         }
@@ -149,19 +209,35 @@ fun HomeScreen(
 
         Button(
             onClick = {
-                viewModel.logout {
-                    navController.navigate("login") {
-                        popUpTo(0) { inclusive = true }
+                viewModel.logout(
+                    onLogoutSuccess = {
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onLogoutError = { errorMsg ->
+                        // Ya manejado por el diálogo al actualizar el state
                     }
-                }
+                )
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !uiState.isLoggingOut,
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             )
         ) {
-            Text("Cerrar Sesión")
+            if (uiState.isLoggingOut) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Cerrando sesión...")
+            } else {
+                Text("Cerrar Sesión")
+            }
         }
     }
 }

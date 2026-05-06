@@ -333,11 +333,11 @@ class ManualSyncManager @Inject constructor(
             val entity = selectionWithWeights.selection
             val now = nowIso()
             val syncingSelection = entity.copy(syncState = SyncState.SYNCING, lastSyncAttemptAt = now, syncError = null)
-            selectionDao.insertSelection(syncingSelection)
+            selectionDao.updateSelection(syncingSelection)
 
             val tradeRemoteId = tradeDao.getTradeById(entity.tradeLocalId)?.remoteId
             if (tradeRemoteId == null) {
-                selectionDao.insertSelection(syncingSelection.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = "Negocio sin remoteId"))
+                selectionDao.updateSelection(syncingSelection.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = "Negocio sin remoteId"))
                 failedCount++
                 return@syncConcurrent
             }
@@ -363,11 +363,33 @@ class ManualSyncManager @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 database.withTransaction {
                     val remoteSelection = response.body()!!.selection
-                    upsertRemoteSelection(remoteSelection, now)
+                    val updatedSelection = syncingSelection.copy(
+                        remoteId = remoteSelection.selectionByTradeId,
+                        price = remoteSelection.price?.toDoubleOrNull(),
+                        selectionTypeName = remoteSelection.selectionType?.nameSelection,
+                        syncState = SyncState.CLEAN,
+                        lastSyncedAt = now,
+                        serverUpdatedAt = remoteSelection.updatedAt,
+                        syncError = null
+                    )
+                    selectionDao.updateSelection(updatedSelection)
+                    
+                    selectionDao.deleteUnitWeightsBySelectionId(updatedSelection.localId)
+                    selectionDao.insertUnitWeights(
+                        remoteSelection.unitWeights.orEmpty().map { unitWeight ->
+                            UnitWeightEntity(
+                                localId = unitWeight.unitWeightId,
+                                remoteId = unitWeight.unitWeightId,
+                                selectionLocalId = updatedSelection.localId,
+                                weight = unitWeight.weight.toDoubleOrNull() ?: 0.0,
+                                amount = unitWeight.amount
+                            )
+                        }
+                    )
                 }
                 successCount++
             } else {
-                selectionDao.insertSelection(syncingSelection.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = response.errorBody()?.string()))
+                selectionDao.updateSelection(syncingSelection.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = response.errorBody()?.string()))
                 failedCount++
             }
         }

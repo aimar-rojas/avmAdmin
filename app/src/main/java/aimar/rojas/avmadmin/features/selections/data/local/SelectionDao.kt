@@ -27,6 +27,9 @@ interface SelectionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSelection(selection: SelectionEntity): Long
 
+    @androidx.room.Update
+    suspend fun updateSelection(selection: SelectionEntity)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSelections(selections: List<SelectionEntity>)
 

@@ -666,17 +666,16 @@ fun TradeItem(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
-                                .clickable { onSyncClick() }
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Sync,
-                                contentDescription = "Sync",
+                                contentDescription = "Pendiente de Sincronización",
                                 tint = Color(0xFFFFA500),
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Sincronizar",
+                                text = "Pendiente",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFFFFA500),
                                 fontWeight = FontWeight.Bold

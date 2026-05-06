@@ -28,6 +28,7 @@ class HomeViewModel @Inject constructor(
     init {
         loadUser()
         observeSyncStatus()
+        syncNow() // Auto-sync on app open
     }
 
     private fun loadUser() {
@@ -37,11 +38,31 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun logout(onLogoutSuccess: () -> Unit) {
+    fun logout(onLogoutSuccess: () -> Unit, onLogoutError: (String) -> Unit) {
         viewModelScope.launch {
-            authRepository.logout()
-            onLogoutSuccess()
+            _uiState.update { it.copy(isLoggingOut = true) }
+            val status = manualSyncManager.status.value
+            val totalPending = status.summary.partyPending + status.summary.shipmentPending + 
+                               status.summary.tradePending + status.summary.selectionPending
+            
+            if (totalPending > 0) {
+                val syncResult = manualSyncManager.syncNow()
+                if (syncResult.state == "success") {
+                    authRepository.logout()
+                    onLogoutSuccess()
+                } else {
+                    _uiState.update { it.copy(isLoggingOut = false) }
+                    onLogoutError("No se puede cerrar sesión. Tienes datos pendientes de sincronizar y la sincronización falló. Por favor, conéctate a internet e inténtalo de nuevo.")
+                }
+            } else {
+                authRepository.logout()
+                onLogoutSuccess()
+            }
         }
+    }
+
+    fun clearLogoutError() {
+        _uiState.update { it.copy(logoutError = null) }
     }
 
     private fun observeSyncStatus() {
@@ -61,5 +82,7 @@ class HomeViewModel @Inject constructor(
 
 data class HomeUiState(
     val user: aimar.rojas.avmadmin.domain.model.User? = null,
-    val syncStatus: SyncStatus = SyncStatus()
+    val syncStatus: SyncStatus = SyncStatus(),
+    val logoutError: String? = null,
+    val isLoggingOut: Boolean = false
 )
