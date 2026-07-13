@@ -18,7 +18,8 @@ gson = "2.10.1"
 androidbrowserhelper = "2.6.2"
 datastore = "1.1.1"
 coreSplashscreen = "1.0.1"
-room = "2.6.1"
+room = "2.7.2"
+runtime = "1.11.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -52,6 +53,7 @@ androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscree
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

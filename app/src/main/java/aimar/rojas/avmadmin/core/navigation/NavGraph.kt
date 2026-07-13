@@ -13,6 +13,8 @@ import aimar.rojas.avmadmin.features.parties.presentation.PurchasesScreen
 import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsDetailScreen
 import aimar.rojas.avmadmin.features.selections.presentation.TradeSelectionsScreen
 import aimar.rojas.avmadmin.features.selections.presentation.TradeSummaryScreen
+import aimar.rojas.avmadmin.features.apuntes.presentation.ApuntesScreen
+import aimar.rojas.avmadmin.features.apuntes.presentation.ApuntesHistoryScreen
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
@@ -70,6 +72,14 @@ fun NavGraph(
         ) { backStackEntry ->
             val tradeId = backStackEntry.arguments?.getInt("tradeId") ?: -1
             TradeSummaryScreen(navController = navController, tradeId = tradeId)
+        }
+
+        composable("apuntes") {
+            ApuntesScreen(navController = navController)
+        }
+
+        composable("apuntes_history") {
+            ApuntesHistoryScreen(navController = navController)
         }
     }
 }
