@@ -3,6 +3,7 @@ package aimar.rojas.avmadmin.features.home.presentation
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -13,18 +14,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import aimar.rojas.avmadmin.R
 import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
+import aimar.rojas.avmadmin.ui.components.AvmSecondaryButton
 
 @Composable
 fun HomeScreen(
@@ -51,179 +58,111 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp)
+            .padding(horizontal = 20.dp, vertical = 24.dp)
             .navigationBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.log_circular),
-            contentDescription = "Logo Productos Aimar Miguel y Violeta",
-            modifier = Modifier
-                .size(150.dp)
-                .padding(bottom = 24.dp)
+        UserHeader(
+            username = uiState.user?.username,
+            email = uiState.user?.email
         )
 
-        Text(
-            text = "Bienvenido",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (uiState.user != null) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = "Usuario: ${uiState.user!!.username}",
-                style = MaterialTheme.typography.bodyLarge,
+                text = "¿Qué vas a hacer?",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Email: ${uiState.user!!.email}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-            )
-        }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OptionCard(
-                title = "Envíos",
-                modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                onClick = { navController.navigate("shipments") }
-            )
-            OptionCard(
-                title = "Productores",
-                modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                onClick = { navController.navigate("producers") }
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OptionCard(
-                title = "Compradores",
-                modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                onClick = { navController.navigate("purchases") }
-            )
-            OptionCard(
-                title = "Apuntes",
-                modifier = Modifier.weight(1f),
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                onClick = { navController.navigate("apuntes") }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        val totalPending = uiState.syncStatus.summary.totalPending
-        val isSyncing = uiState.syncStatus.isRunning
-        val hasError = uiState.syncStatus.state == "error"
-        
-        val syncContainerColor = if (hasError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant
-        val syncContentColor = if (hasError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
-        
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = syncContainerColor)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val icon = when {
-                            isSyncing -> Icons.Filled.CloudSync
-                            totalPending > 0 -> Icons.Filled.CloudOff
-                            else -> Icons.Filled.CloudDone
-                        }
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = "Estado de Sincronización",
-                            tint = if (totalPending > 0 && !isSyncing) Color(0xFFFFA500) else syncContentColor
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "Estado Nube",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = syncContentColor
-                        )
-                    }
-                    if (totalPending > 0) {
-                        Badge(containerColor = MaterialTheme.colorScheme.error) {
-                            Text("$totalPending pendientes", modifier = Modifier.padding(horizontal = 4.dp))
-                        }
-                    } else if (!isSyncing) {
-                        Badge(containerColor = Color(0xFF4CAF50)) {
-                            Text("Sincronizado", modifier = Modifier.padding(horizontal = 4.dp))
-                        }
-                    }
-                }
-                
-                if (isSyncing) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    uiState.syncStatus.phase?.let { phase ->
-                        Text(
-                            text = phase,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = syncContentColor
-                        )
-                    }
-                } else {
-                    uiState.syncStatus.message?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = syncContentColor
-                        )
-                    }
-                }
-                
-                uiState.syncStatus.lastSuccessAt?.let { lastSuccess ->
-                    Text(
-                        text = "Último sync exitoso: $lastSuccess",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = syncContentColor.copy(alpha = 0.7f)
-                    )
-                }
+                HomeActionCard(
+                    title = "Envíos",
+                    subtitle = "Ver y crear envíos",
+                    icon = Icons.Filled.LocalShipping,
+                    modifier = Modifier.weight(1f),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    onClick = { navController.navigate("shipments") }
+                )
+                HomeActionCard(
+                    title = "Productores",
+                    subtitle = "Gestionar proveedores",
+                    icon = Icons.Filled.Groups,
+                    modifier = Modifier.weight(1f),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    onClick = { navController.navigate("producers") }
+                )
+            }
 
-                AvmPrimaryButton(
-                    text = if (hasError) "Reintentar" else "Sincronizar ahora",
-                    onClick = { viewModel.syncNow() },
-                    enabled = !isSyncing,
-                    isLoading = isSyncing,
-                    loadingText = "Sincronizando...",
-                    leadingIcon = Icons.Filled.CloudSync,
-                    modifier = Modifier.fillMaxWidth(),
-                    containerColor = if (hasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                HomeActionCard(
+                    title = "Compradores",
+                    subtitle = "Clientes y datos",
+                    icon = Icons.Filled.ShoppingCart,
+                    modifier = Modifier.weight(1f),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    onClick = { navController.navigate("purchases") }
+                )
+                HomeActionCard(
+                    title = "Apuntes",
+                    subtitle = "Registro rápido",
+                    icon = Icons.Filled.EditNote,
+                    modifier = Modifier.weight(1f),
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    onClick = { navController.navigate("apuntes") }
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        val totalPending = uiState.syncStatus.summary.totalPending
+        val isSyncing = uiState.syncStatus.isRunning
+        val hasError = uiState.syncStatus.state == "error"
+        val syncTitle = when {
+            isSyncing -> "Sincronizando datos"
+            hasError -> "Error al sincronizar"
+            totalPending > 0 -> "Hay datos pendientes"
+            else -> "Todo sincronizado"
+        }
+        val syncDescription = when {
+            isSyncing -> uiState.syncStatus.phase ?: "Enviando cambios a la nube."
+            hasError -> uiState.syncStatus.message ?: "No se pudo completar la sincronización."
+            totalPending > 0 -> "$totalPending cambios esperando conexión o sincronización."
+            else -> uiState.syncStatus.message ?: "Tus datos están al día."
+        }
+        val syncContainerColor = if (hasError) {
+            MaterialTheme.colorScheme.errorContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        }
+        val syncContentColor = if (hasError) {
+            MaterialTheme.colorScheme.onErrorContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
 
-        AvmPrimaryButton(
+        SyncStatusPanel(
+            title = syncTitle,
+            description = syncDescription,
+            lastSuccessAt = uiState.syncStatus.lastSuccessAt,
+            totalPending = totalPending,
+            isSyncing = isSyncing,
+            hasError = hasError,
+            containerColor = syncContainerColor,
+            contentColor = syncContentColor,
+            onSyncClick = { viewModel.syncNow() }
+        )
+
+        AvmSecondaryButton(
             text = "Cerrar Sesión",
             onClick = {
                 viewModel.logout(
@@ -232,7 +171,7 @@ fun HomeScreen(
                             popUpTo(0) { inclusive = true }
                         }
                     },
-                    onLogoutError = { errorMsg ->
+                    onLogoutError = {
                         // Ya manejado por el diálogo al actualizar el state
                     }
                 )
@@ -240,14 +179,63 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(),
             enabled = !uiState.isLoggingOut,
             isLoading = uiState.isLoggingOut,
-            loadingText = "Cerrando sesión..."
+            loadingText = "Cerrando sesión...",
+            leadingIcon = Icons.AutoMirrored.Filled.Logout
         )
     }
 }
 
 @Composable
-fun OptionCard(
+private fun UserHeader(
+    username: String?,
+    email: String?
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.log_circular),
+                contentDescription = "Logo Productos Aimar Miguel y Violeta",
+                modifier = Modifier.size(72.dp)
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = if (username.isNullOrBlank()) "Bienvenido" else "Hola, $username",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (!email.isNullOrBlank()) {
+                    Text(
+                        text = email,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeActionCard(
     title: String,
+    subtitle: String,
+    icon: ImageVector,
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
@@ -255,22 +243,131 @@ fun OptionCard(
 ) {
     Card(
         modifier = modifier
-            .aspectRatio(1f)
+            .heightIn(min = 116.dp)
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = containerColor
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(34.dp)
+            )
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = contentColor
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = contentColor.copy(alpha = 0.78f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncStatusPanel(
+    title: String,
+    description: String,
+    lastSuccessAt: String?,
+    totalPending: Int,
+    isSyncing: Boolean,
+    hasError: Boolean,
+    containerColor: Color,
+    contentColor: Color,
+    onSyncClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val icon = when {
+                        isSyncing -> Icons.Filled.CloudSync
+                        hasError || totalPending > 0 -> Icons.Filled.CloudOff
+                        else -> Icons.Filled.CloudDone
+                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (totalPending > 0 && !hasError && !isSyncing) Color(0xFF9A6700) else contentColor,
+                        modifier = Modifier.size(30.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = contentColor
+                    )
+                }
+
+                if (totalPending > 0) {
+                    Badge(containerColor = MaterialTheme.colorScheme.error) {
+                        Text("$totalPending")
+                    }
+                }
+            }
+
+            if (isSyncing) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
+                text = description,
+                style = MaterialTheme.typography.bodyLarge,
                 color = contentColor
+            )
+
+            lastSuccessAt?.let { lastSuccess ->
+                Text(
+                    text = "Último sync exitoso: $lastSuccess",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor.copy(alpha = 0.72f)
+                )
+            }
+
+            AvmPrimaryButton(
+                text = if (hasError) "Reintentar sincronización" else "Sincronizar ahora",
+                onClick = onSyncClick,
+                enabled = !isSyncing,
+                isLoading = isSyncing,
+                loadingText = "Sincronizando...",
+                leadingIcon = Icons.Filled.CloudSync,
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = if (hasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             )
         }
     }

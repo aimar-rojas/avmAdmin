@@ -11,6 +11,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
@@ -118,6 +119,61 @@ fun AvmPrimaryButton(
                 } else {
                     MaterialTheme.typography.labelLarge
                 },
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+fun AvmSecondaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    isLoading: Boolean = false,
+    loadingText: String? = null,
+    leadingIcon: ImageVector? = null,
+    size: AvmButtonSize = AvmButtonSize.Default
+) {
+    OutlinedButton(
+        onClick = {
+            if (!isLoading) {
+                onClick()
+            }
+        },
+        modifier = modifier.heightIn(min = size.minHeight),
+        enabled = enabled && !isLoading,
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(horizontal = 22.dp, vertical = 0.dp)
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(size.progressSize),
+                strokeWidth = 2.dp
+            )
+
+            if (loadingText != null) {
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = loadingText,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        } else {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(size.iconSize)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
         }
