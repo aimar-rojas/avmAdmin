@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import aimar.rojas.avmadmin.R
+import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 
 @Composable
 fun HomeScreen(
@@ -207,24 +208,23 @@ fun HomeScreen(
                     )
                 }
 
-                Button(
+                AvmPrimaryButton(
+                    text = if (hasError) "Reintentar" else "Sincronizar ahora",
                     onClick = { viewModel.syncNow() },
                     enabled = !isSyncing,
+                    isLoading = isSyncing,
+                    loadingText = "Sincronizando...",
+                    leadingIcon = Icons.Filled.CloudSync,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (hasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(Icons.Filled.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (isSyncing) "Sincronizando..." else if (hasError) "Reintentar" else "Sincronizar ahora")
-                }
+                    containerColor = if (hasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
+        AvmPrimaryButton(
+            text = "Cerrar Sesión",
             onClick = {
                 viewModel.logout(
                     onLogoutSuccess = {
@@ -239,23 +239,9 @@ fun HomeScreen(
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !uiState.isLoggingOut,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            )
-        ) {
-            if (uiState.isLoggingOut) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Cerrando sesión...")
-            } else {
-                Text("Cerrar Sesión")
-            }
-        }
+            isLoading = uiState.isLoggingOut,
+            loadingText = "Cerrando sesión..."
+        )
     }
 }
 

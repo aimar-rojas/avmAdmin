@@ -97,9 +97,6 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
-    }
 }
 
 data class LoginUiState(

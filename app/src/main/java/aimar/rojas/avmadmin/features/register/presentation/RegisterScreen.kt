@@ -1,5 +1,6 @@
 package aimar.rojas.avmadmin.features.register.presentation
 
+import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
@@ -131,20 +132,13 @@ fun RegisterScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
+        AvmPrimaryButton(
+            text = "Registrarse",
             onClick = viewModel::register,
             modifier = Modifier.fillMaxWidth(),
-            enabled = !uiState.isLoading
-        ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
-                Text("Registrarse")
-            }
-        }
+            enabled = !uiState.isLoading,
+            isLoading = uiState.isLoading
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 

@@ -1,5 +1,7 @@
 package aimar.rojas.avmadmin.features.apuntes.presentation
 
+import aimar.rojas.avmadmin.ui.components.AvmButtonSize
+import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -175,21 +177,16 @@ fun ApuntesScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
+            AvmPrimaryButton(
+                text = "GUARDAR APUNTE",
                 onClick = { viewModel.saveApunte() },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp)
                     .navigationBarsPadding(),
                 enabled = !uiState.isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(36.dp))
-                } else {
-                    Text("GUARDAR APUNTE", style = MaterialTheme.typography.headlineSmall)
-                }
-            }
+                isLoading = uiState.isLoading,
+                size = AvmButtonSize.Large
+            )
             Spacer(modifier = Modifier.height(24.dp))
         }
     }

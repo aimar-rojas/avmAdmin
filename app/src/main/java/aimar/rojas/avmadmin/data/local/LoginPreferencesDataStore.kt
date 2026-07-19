@@ -7,9 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,9 +20,6 @@ class LoginPreferencesDataStore @Inject constructor(
     private val dataStore: DataStore<Preferences> = context.loginPreferencesDataStore
 
     private val rememberedEmailKey = stringPreferencesKey("remembered_email")
-
-    val rememberedEmailFlow: Flow<String?> = dataStore.data
-        .map { preferences -> preferences[rememberedEmailKey] }
 
     suspend fun getRememberedEmail(): String? {
         return dataStore.data.first()[rememberedEmailKey]

@@ -1,6 +1,7 @@
 package aimar.rojas.avmadmin.features.login.presentation
 
 import aimar.rojas.avmadmin.R
+import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
@@ -191,20 +192,13 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Button(
+            AvmPrimaryButton(
+                text = "Iniciar Sesión",
                 onClick = viewModel::login,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.isLoading
-            ) {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Iniciar Sesión")
-                }
-            }
+                enabled = !uiState.isLoading,
+                isLoading = uiState.isLoading
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
