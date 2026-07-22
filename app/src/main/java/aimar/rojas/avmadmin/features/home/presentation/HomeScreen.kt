@@ -32,6 +32,7 @@ import androidx.navigation.NavController
 import aimar.rojas.avmadmin.R
 import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 import aimar.rojas.avmadmin.ui.components.AvmSecondaryButton
+import aimar.rojas.avmadmin.utils.DateUtils
 
 @Composable
 fun HomeScreen(
@@ -127,24 +128,28 @@ fun HomeScreen(
         val totalPending = uiState.syncStatus.summary.totalPending
         val isSyncing = uiState.syncStatus.isRunning
         val hasError = uiState.syncStatus.state == "error"
+        val hasPartialFailure = uiState.syncStatus.state == "partial_failure"
         val syncTitle = when {
             isSyncing -> "Sincronizando datos"
             hasError -> "Error al sincronizar"
+            hasPartialFailure -> "Sincronización incompleta"
             totalPending > 0 -> "Hay datos pendientes"
             else -> "Todo sincronizado"
         }
         val syncDescription = when {
             isSyncing -> uiState.syncStatus.phase ?: "Enviando cambios a la nube."
             hasError -> uiState.syncStatus.message ?: "No se pudo completar la sincronización."
+            hasPartialFailure -> uiState.syncStatus.message ?: "Algunos datos no pudieron sincronizarse."
             totalPending > 0 -> "$totalPending cambios esperando conexión o sincronización."
             else -> uiState.syncStatus.message ?: "Tus datos están al día."
         }
-        val syncContainerColor = if (hasError) {
+        val hasSyncProblem = hasError || hasPartialFailure
+        val syncContainerColor = if (hasSyncProblem) {
             MaterialTheme.colorScheme.errorContainer
         } else {
             MaterialTheme.colorScheme.surfaceVariant
         }
-        val syncContentColor = if (hasError) {
+        val syncContentColor = if (hasSyncProblem) {
             MaterialTheme.colorScheme.onErrorContainer
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
@@ -156,7 +161,7 @@ fun HomeScreen(
             lastSuccessAt = uiState.syncStatus.lastSuccessAt,
             totalPending = totalPending,
             isSyncing = isSyncing,
-            hasError = hasError,
+            hasSyncProblem = hasSyncProblem,
             containerColor = syncContainerColor,
             contentColor = syncContentColor,
             onSyncClick = { viewModel.syncNow() }
@@ -288,7 +293,7 @@ private fun SyncStatusPanel(
     lastSuccessAt: String?,
     totalPending: Int,
     isSyncing: Boolean,
-    hasError: Boolean,
+    hasSyncProblem: Boolean,
     containerColor: Color,
     contentColor: Color,
     onSyncClick: () -> Unit
@@ -316,13 +321,13 @@ private fun SyncStatusPanel(
                 ) {
                     val icon = when {
                         isSyncing -> Icons.Filled.CloudSync
-                        hasError || totalPending > 0 -> Icons.Filled.CloudOff
+                        hasSyncProblem || totalPending > 0 -> Icons.Filled.CloudOff
                         else -> Icons.Filled.CloudDone
                     }
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = if (totalPending > 0 && !hasError && !isSyncing) Color(0xFF9A6700) else contentColor,
+                        tint = if (totalPending > 0 && !hasSyncProblem && !isSyncing) Color(0xFF9A6700) else contentColor,
                         modifier = Modifier.size(30.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -353,21 +358,21 @@ private fun SyncStatusPanel(
 
             lastSuccessAt?.let { lastSuccess ->
                 Text(
-                    text = "Último sync exitoso: $lastSuccess",
+                    text = "Última sincronización exitosa: ${DateUtils.formatSyncTimestampToDisplay(lastSuccess) ?: lastSuccess}",
                     style = MaterialTheme.typography.labelMedium,
                     color = contentColor.copy(alpha = 0.72f)
                 )
             }
 
             AvmPrimaryButton(
-                text = if (hasError) "Reintentar sincronización" else "Sincronizar ahora",
+                text = if (hasSyncProblem) "Reintentar sincronización" else "Sincronizar ahora",
                 onClick = onSyncClick,
                 enabled = !isSyncing,
                 isLoading = isSyncing,
                 loadingText = "Sincronizando...",
                 leadingIcon = Icons.Filled.CloudSync,
                 modifier = Modifier.fillMaxWidth(),
-                containerColor = if (hasError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                containerColor = if (hasSyncProblem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             )
         }
     }

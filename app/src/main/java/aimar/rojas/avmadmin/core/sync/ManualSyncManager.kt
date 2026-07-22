@@ -46,6 +46,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -132,14 +133,17 @@ class ManualSyncManager @Inject constructor(
             pullSelections()
 
             val finishedAt = nowIso()
-            sessionDataStore.saveLastManualSyncSuccess(finishedAt)
+            val completedSuccessfully = resultSummary.failedItems == 0
+            if (completedSuccessfully) {
+                sessionDataStore.saveLastManualSyncSuccess(finishedAt)
+            }
             _status.update {
                 it.copy(
-                    state = if (resultSummary.failedItems > 0) "partial_failure" else "success",
+                    state = if (completedSuccessfully) "success" else "partial_failure",
                     phase = null,
                     result = resultSummary,
-                    message = if (resultSummary.failedItems > 0) "Sincronización completada con fallos parciales." else "Sincronización completada.",
-                    lastSuccessAt = finishedAt,
+                    message = if (completedSuccessfully) "Sincronización completada." else "Sincronización completada con fallos parciales.",
+                    lastSuccessAt = if (completedSuccessfully) finishedAt else it.lastSuccessAt,
                     isRunning = false
                 )
             }
@@ -161,8 +165,8 @@ class ManualSyncManager @Inject constructor(
     private suspend fun syncParties(): SyncResultSummary {
         _status.update { it.copy(phase = "Subiendo contactos") }
         val pending = partyDao.getPendingSyncParties()
-        var successCount = 0
-        var failedCount = 0
+        val successCount = AtomicInteger(0)
+        val failedCount = AtomicInteger(0)
         syncConcurrent(pending, 4) { entity ->
             val now = nowIso()
             val syncingEntity = entity.copy(syncState = SyncState.SYNCING, lastSyncAttemptAt = now, syncError = null)
@@ -184,10 +188,10 @@ class ManualSyncManager @Inject constructor(
                     val dto = response.body()!!.party
                     val updated = syncingEntity.mergeRemote(dto, now)
                     partyDao.insertParty(updated)
-                    successCount++
+                    successCount.incrementAndGet()
                 } else {
                     partyDao.insertParty(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = response.errorBody()?.string()))
-                    failedCount++
+                    failedCount.incrementAndGet()
                 }
             } else {
                 val response = partiesApiService.updateParty(
@@ -207,21 +211,21 @@ class ManualSyncManager @Inject constructor(
                     val dto = response.body()!!.party
                     val updated = syncingEntity.mergeRemote(dto, now)
                     partyDao.insertParty(updated)
-                    successCount++
+                    successCount.incrementAndGet()
                 } else {
                     partyDao.insertParty(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = response.errorBody()?.string()))
-                    failedCount++
+                    failedCount.incrementAndGet()
                 }
             }
         }
-        return SyncResultSummary(pushedParties = successCount, failedItems = failedCount)
+        return SyncResultSummary(pushedParties = successCount.get(), failedItems = failedCount.get())
     }
 
     private suspend fun syncShipments(): SyncResultSummary {
         _status.update { it.copy(phase = "Subiendo envíos") }
         val pending = shipmentDao.getPendingSyncShipments()
-        var successCount = 0
-        var failedCount = 0
+        val successCount = AtomicInteger(0)
+        val failedCount = AtomicInteger(0)
         syncConcurrent(pending, 4) { entity ->
             val now = nowIso()
             val syncingEntity = entity.copy(syncState = SyncState.SYNCING, lastSyncAttemptAt = now, syncError = null)
@@ -238,10 +242,10 @@ class ManualSyncManager @Inject constructor(
                     val dto = response.body()!!.shipment
                     val updated = syncingEntity.mergeRemote(dto, now)
                     shipmentDao.insertShipment(updated)
-                    successCount++
+                    successCount.incrementAndGet()
                 } else {
                     shipmentDao.insertShipment(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = response.errorBody()?.string()))
-                    failedCount++
+                    failedCount.incrementAndGet()
                 }
             } else {
                 val response = shipmentsApiService.updateShipment(
@@ -256,21 +260,21 @@ class ManualSyncManager @Inject constructor(
                     val dto = response.body()!!.shipment
                     val updated = syncingEntity.mergeRemote(dto, now)
                     shipmentDao.insertShipment(updated)
-                    successCount++
+                    successCount.incrementAndGet()
                 } else {
                     shipmentDao.insertShipment(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = response.errorBody()?.string()))
-                    failedCount++
+                    failedCount.incrementAndGet()
                 }
             }
         }
-        return SyncResultSummary(pushedShipments = successCount, failedItems = failedCount)
+        return SyncResultSummary(pushedShipments = successCount.get(), failedItems = failedCount.get())
     }
 
     private suspend fun syncTrades(): SyncResultSummary {
         _status.update { it.copy(phase = "Subiendo negocios") }
         val pending = tradeDao.getPendingSyncTrades()
-        var successCount = 0
-        var failedCount = 0
+        val successCount = AtomicInteger(0)
+        val failedCount = AtomicInteger(0)
         syncConcurrent(pending, 4) { entity ->
             val now = nowIso()
             val syncingEntity = entity.copy(syncState = SyncState.SYNCING, lastSyncAttemptAt = now, syncError = null)
@@ -280,7 +284,7 @@ class ManualSyncManager @Inject constructor(
             val shipmentRemoteId = shipmentDao.getShipmentById(entity.shipmentLocalId)?.remoteId
             if (partyRemoteId == null || shipmentRemoteId == null) {
                 tradeDao.insertTrade(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = "Dependencias sin remoteId"))
-                failedCount++
+                failedCount.incrementAndGet()
                 return@syncConcurrent
             }
 
@@ -315,20 +319,20 @@ class ManualSyncManager @Inject constructor(
                 val dto = response.body()!!.trade
                 val updated = syncingEntity.mergeRemote(dto, now)
                 tradeDao.insertTrade(updated)
-                successCount++
+                successCount.incrementAndGet()
             } else {
                 tradeDao.insertTrade(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = response.errorBody()?.string()))
-                failedCount++
+                failedCount.incrementAndGet()
             }
         }
-        return SyncResultSummary(pushedTrades = successCount, failedItems = failedCount)
+        return SyncResultSummary(pushedTrades = successCount.get(), failedItems = failedCount.get())
     }
 
     private suspend fun syncSelections(): SyncResultSummary {
         _status.update { it.copy(phase = "Subiendo selecciones") }
         val pending = selectionDao.getPendingSelections()
-        var successCount = 0
-        var failedCount = 0
+        val successCount = AtomicInteger(0)
+        val failedCount = AtomicInteger(0)
         syncConcurrent(pending, 6) { selectionWithWeights ->
             val entity = selectionWithWeights.selection
             val now = nowIso()
@@ -338,7 +342,7 @@ class ManualSyncManager @Inject constructor(
             val tradeRemoteId = tradeDao.getTradeById(entity.tradeLocalId)?.remoteId
             if (tradeRemoteId == null) {
                 selectionDao.updateSelection(syncingSelection.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = "Negocio sin remoteId"))
-                failedCount++
+                failedCount.incrementAndGet()
                 return@syncConcurrent
             }
 
@@ -387,13 +391,13 @@ class ManualSyncManager @Inject constructor(
                         }
                     )
                 }
-                successCount++
+                successCount.incrementAndGet()
             } else {
                 selectionDao.updateSelection(syncingSelection.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = response.errorBody()?.string()))
-                failedCount++
+                failedCount.incrementAndGet()
             }
         }
-        return SyncResultSummary(pushedSelections = successCount, failedItems = failedCount)
+        return SyncResultSummary(pushedSelections = successCount.get(), failedItems = failedCount.get())
     }
 
     private suspend fun pullParties() {
