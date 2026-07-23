@@ -36,11 +36,11 @@ class ApuntesHistoryViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(error = null) }
             val result = repository.getApuntes()
-            result.onFailure { err ->
+            result.onFailure {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = if (it.records.isEmpty()) err.message ?: "Error al cargar historial" else null
+                        error = null
                     )
                 }
             }

@@ -94,16 +94,6 @@ class ApuntesRepositoryImpl @Inject constructor(
         details: List<ApunteDetail>
     ): Result<Apunte> {
         val now = DateUtils.currentUtcSyncTimestamp()
-        val requestDto = CreateApunteRequestDto(
-            observations = observations,
-            details = details.map {
-                CreateApunteDetailRequestDto(
-                    selectionTypeId = it.selectionTypeId,
-                    jabaCount = it.jabaCount,
-                    isEnabled = it.isEnabled
-                )
-            }
-        )
         val currentUser = sessionDataStore.getUser()
         val localId = apuntesDao.insertRecordWithDetails(
             ApunteEntity(
@@ -115,41 +105,9 @@ class ApuntesRepositoryImpl @Inject constructor(
             ),
             details.map { it.toEntity(apunteLocalId = 0) }
         )
-        val localRecord = apuntesDao.getApuntesWithDetails()
-            .first { it.apunte.localId == localId }
-
-        return try {
-            val response = apiService.createApunte(requestDto)
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body != null) {
-                    val remote = body.record
-                    apuntesDao.replaceRecordWithDetails(
-                        remote.toEntity(localId = localId, now = DateUtils.currentUtcSyncTimestamp()),
-                        remote.details.orEmpty().map { it.toEntity(localId) }
-                    )
-                    Result.success(
-                        apuntesDao.getApuntesWithDetails()
-                            .first { it.apunte.localId == localId }
-                            .toDomain()
-                    )
-                } else {
-                    val message = "Cuerpo de respuesta vacío"
-                    Log.w(TAG, "Create apunte succeeded without body. localId=$localId")
-                    apuntesDao.insertApunte(localRecord.apunte.copy(syncState = SyncState.FAILED_CREATE, syncError = message))
-                    Result.success(localRecord.toDomain())
-                }
-            } else {
-                val error = response.errorBody()?.string() ?: "HTTP ${response.code()}"
-                Log.w(TAG, "Create apunte failed. localId=$localId, http=${response.code()}, error=$error")
-                apuntesDao.insertApunte(localRecord.apunte.copy(syncState = SyncState.FAILED_CREATE, syncError = error))
-                Result.success(localRecord.toDomain())
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Create apunte threw an exception. localId=$localId", e)
-            apuntesDao.insertApunte(localRecord.apunte.copy(syncState = SyncState.FAILED_CREATE, syncError = e.message))
-            Result.success(localRecord.toDomain())
-        }
+        val localRecord = apuntesDao.getApunteWithDetailsById(localId)
+            ?: return Result.failure(Exception("No se pudo guardar el apunte localmente"))
+        return Result.success(localRecord.toDomain())
     }
 
     override suspend fun updateApunte(
@@ -169,7 +127,6 @@ class ApuntesRepositoryImpl @Inject constructor(
         } else {
             SyncState.PENDING_UPDATE
         }
-        val now = DateUtils.currentUtcSyncTimestamp()
         apuntesDao.replaceRecordWithDetails(
             existing.apunte.copy(
                 observations = observations,
@@ -180,62 +137,9 @@ class ApuntesRepositoryImpl @Inject constructor(
             details.map { it.toEntity(apunteLocalId = localId) }
         )
 
-        val requestDto = details.toCreateRequest(observations)
-        return try {
-            val remoteId = existing.apunte.remoteId
-            val response = if (remoteId == null) {
-                apiService.createApunte(requestDto)
-            } else {
-                apiService.updateApunte(remoteId, requestDto)
-            }
-            if (response.isSuccessful && response.body() != null) {
-                val remote = response.body()!!.record
-                apuntesDao.replaceRecordWithDetails(
-                    remote.toEntity(localId = localId, now = DateUtils.currentUtcSyncTimestamp()),
-                    remote.details.orEmpty().map { it.toEntity(localId) }
-                )
-                Result.success(
-                    apuntesDao.getApunteWithDetailsById(localId)?.toDomain()
-                        ?: existing.toDomain()
-                )
-            } else {
-                val error = response.errorBody()?.string() ?: "HTTP ${response.code()}"
-                Log.w(TAG, "Update apunte failed. localId=$localId, remoteId=$remoteId, http=${response.code()}, error=$error")
-                apuntesDao.insertApunte(
-                    existing.apunte.copy(
-                        observations = observations,
-                        syncState = SyncState.failureStateFor(pendingState),
-                        lastSyncAttemptAt = now,
-                        syncError = error
-                    )
-                )
-                Result.success(apuntesDao.getApunteWithDetailsById(localId)?.toDomain() ?: existing.toDomain())
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Update apunte threw an exception. localId=$localId", e)
-            apuntesDao.insertApunte(
-                existing.apunte.copy(
-                    observations = observations,
-                    syncState = SyncState.failureStateFor(pendingState),
-                    lastSyncAttemptAt = now,
-                    syncError = e.message
-                )
-            )
-            Result.success(apuntesDao.getApunteWithDetailsById(localId)?.toDomain() ?: existing.toDomain())
-        }
-    }
-
-    private fun List<ApunteDetail>.toCreateRequest(observations: String): CreateApunteRequestDto {
-        return CreateApunteRequestDto(
-            observations = observations,
-            details = map {
-                CreateApunteDetailRequestDto(
-                    selectionTypeId = it.selectionTypeId,
-                    jabaCount = it.jabaCount,
-                    isEnabled = it.isEnabled
-                )
-            }
-        )
+        val updatedRecord = apuntesDao.getApunteWithDetailsById(localId)
+            ?: return Result.failure(Exception("No se pudo actualizar el apunte localmente"))
+        return Result.success(updatedRecord.toDomain())
     }
 
     private suspend fun getOwnLocalApuntes(): List<Apunte> {
