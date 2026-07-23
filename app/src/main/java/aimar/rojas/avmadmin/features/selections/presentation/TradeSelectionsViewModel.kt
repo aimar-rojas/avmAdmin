@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import aimar.rojas.avmadmin.features.selections.domain.SelectionsRepository
 import aimar.rojas.avmadmin.features.selections.domain.model.SelectionDetail
+import aimar.rojas.avmadmin.features.trades.domain.TradesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,10 +21,18 @@ data class TradeSelectionsUiState(
     val selectedSelectionTypeId: Int = 1,
     val weightInput: String = "",
     val amountInput: String = "",
-    val totalWeight: Double = 0.0,
+    val totalGrossWeight: Double = 0.0,
+    val totalNetWeight: Double = 0.0,
     val totalAmount: Int = 0,
+    val discountWeightPerTray: Double = 0.0,
     val visibleSelectionTypeIds: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7, 8),
     val showSelectionManagerDialog: Boolean = false
+)
+
+private data class WeightTotals(
+    val grossWeight: Double,
+    val netWeight: Double,
+    val amount: Int
 )
 
 data class SelectionTypeInfo(
@@ -34,6 +43,7 @@ data class SelectionTypeInfo(
 @HiltViewModel
 class TradeSelectionsViewModel @Inject constructor(
     private val selectionsRepository: SelectionsRepository,
+    private val tradesRepository: TradesRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -65,16 +75,18 @@ class TradeSelectionsViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
+            val discount = tradesRepository.getTradeById(tradeId).getOrNull()?.discountWeightPerTray ?: 0.0
             val result = selectionsRepository.getSelections(tradeId = tradeId)
             result.onSuccess { selections ->
-                val totalW = selections.sumOf { s -> s.unitWeights.sumOf { it.weight } }
-                val totalA = selections.sumOf { s -> s.unitWeights.sumOf { it.amount } }
+                val totals = calculateTotals(selections, discount)
                 
                 _uiState.update { it.copy(
                     isLoading = false, 
                     selections = selections, 
-                    totalWeight = totalW,
-                    totalAmount = totalA,
+                    totalGrossWeight = totals.grossWeight,
+                    totalNetWeight = totals.netWeight,
+                    totalAmount = totals.amount,
+                    discountWeightPerTray = discount,
                     error = null
                 ) }
             }.onFailure { error ->
@@ -158,13 +170,14 @@ class TradeSelectionsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = selectionsRepository.getLocalSelections(tradeId)
             result.onSuccess { selections ->
-                val totalW = selections.sumOf { s -> s.unitWeights.sumOf { it.weight } }
-                val totalA = selections.sumOf { s -> s.unitWeights.sumOf { it.amount } }
+                val discount = _uiState.value.discountWeightPerTray
+                val totals = calculateTotals(selections, discount)
                 
                 _uiState.update { it.copy(
                     selections = selections, 
-                    totalWeight = totalW,
-                    totalAmount = totalA
+                    totalGrossWeight = totals.grossWeight,
+                    totalNetWeight = totals.netWeight,
+                    totalAmount = totals.amount
                 ) }
             }.onFailure { error ->
                 _uiState.update { it.copy(error = error.message ?: "Error desconocido") }
@@ -209,5 +222,21 @@ class TradeSelectionsViewModel @Inject constructor(
 
     fun getVisibleSelectionTypes(): List<SelectionTypeInfo> {
         return selectionTypes.filter { it.id in _uiState.value.visibleSelectionTypeIds }
+    }
+
+    private fun calculateTotals(
+        selections: List<SelectionDetail>,
+        discountWeightPerTray: Double
+    ): WeightTotals {
+        val gross = selections.sumOf { selection -> selection.unitWeights.sumOf { it.weight } }
+        val amount = selections.sumOf { selection -> selection.unitWeights.sumOf { it.amount } }
+        val discount = amount * discountWeightPerTray
+        val net = (gross - discount).coerceAtLeast(0.0)
+
+        return WeightTotals(
+            grossWeight = gross,
+            netWeight = net,
+            amount = amount
+        )
     }
 }

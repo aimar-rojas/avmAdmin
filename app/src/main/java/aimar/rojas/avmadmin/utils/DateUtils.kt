@@ -27,7 +27,13 @@ object DateUtils {
      * @return Date parseado o null si el formato es inválido
      */
     fun parseApiDate(dateString: String?): Date? {
-        return dateString?.let { apiDateFormat.parse(it) }
+        if (dateString.isNullOrBlank()) return null
+
+        return try {
+            apiDateFormat.parse(dateString)
+        } catch (e: Exception) {
+            null
+        }
     }
     
     /**

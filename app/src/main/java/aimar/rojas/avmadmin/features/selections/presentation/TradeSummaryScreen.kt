@@ -208,6 +208,7 @@ fun SelectionSummaryCard(
                     SummaryDataPoint("Num. Jabas", "${item.crateCount}")
                 }
                 Column(modifier = Modifier.weight(1f)) {
+                    SummaryDataPoint("Descuento", String.format(Locale.getDefault(), "%.2f kg", item.grossWeight - item.netWeight))
                     SummaryDataPoint("Peso Neto", String.format(Locale.getDefault(), "%.2f kg", item.netWeight), highlight = true)
                 }
             }

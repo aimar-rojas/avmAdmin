@@ -5,7 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,7 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateShipmentDialog
+import aimar.rojas.avmadmin.core.sync.SyncState
+import aimar.rojas.avmadmin.ui.components.AvmCatalogHeader
+import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateShipmentBottomSheet
 import aimar.rojas.avmadmin.features.shipments.presentation.components.ShipmentCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,39 +29,25 @@ fun ShipmentsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Envíos / Cargas") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Atrás",
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.showCreateDialog() },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar envío")
-            }
-        }
-    ) { paddingValues ->
-        Box(
+    Scaffold { paddingValues ->
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            AvmCatalogHeader(
+                title = "Envíos",
+                subtitle = "Cargas abiertas y cerradas para organizar operaciones.",
+                countLabel = "${uiState.total} registrados",
+                statusLabel = uiState.pendingSyncLabel(),
+                actionText = "Nuevo envío",
+                actionIcon = Icons.Filled.Add,
+                leadingIcon = Icons.Filled.LocalShipping,
+                onBackClick = { navController.popBackStack() },
+                onActionClick = { viewModel.showCreateDialog() }
+            )
+
+            Box(modifier = Modifier.fillMaxSize()) {
             when {
                 uiState.isLoading && uiState.shipments.isEmpty() -> {
                     CircularProgressIndicator(
@@ -117,10 +105,11 @@ fun ShipmentsScreen(
                     }
                 }
             }
+            }
         }
 
         if (uiState.showCreateDialog) {
-            CreateShipmentDialog(
+            CreateShipmentBottomSheet(
                 uiState = uiState,
                 onDismiss = { viewModel.hideCreateDialog() },
                 onStartDateChange = { viewModel.onCreateStartDateChange(it) },
@@ -146,3 +135,7 @@ fun ShipmentsScreen(
     }
 }
 
+private fun ShipmentsUiState.pendingSyncLabel(): String {
+    val pendingCount = shipments.count { it.syncState != null && it.syncState != SyncState.CLEAN }
+    return if (pendingCount > 0) "$pendingCount pendientes" else "Sincronizado"
+}

@@ -150,8 +150,10 @@ fun TradeSelectionsContent(
         ) {
             // Información del Trade (Resumen)
             TradeSummaryHeader(
-                totalWeight = uiState.totalWeight,
+                totalGrossWeight = uiState.totalGrossWeight,
+                totalNetWeight = uiState.totalNetWeight,
                 totalAmount = uiState.totalAmount,
+                discountWeightPerTray = uiState.discountWeightPerTray,
                 accentColor = accentColor
             )
 
@@ -183,6 +185,7 @@ fun TradeSelectionsContent(
                 UnitWeightInputForm(
                     weight = uiState.weightInput,
                     amount = uiState.amountInput,
+                    discountWeightPerTray = uiState.discountWeightPerTray,
                     onWeightChange = onWeightChange,
                     onAmountChange = onAmountChange,
                     onInsertClick = onInsertClick,
@@ -222,7 +225,11 @@ fun TradeSelectionsContent(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(unitWeights) { unitWeight ->
-                            UnitWeightItem(unitWeight = unitWeight, accentColor = accentColor)
+                            UnitWeightItem(
+                                unitWeight = unitWeight,
+                                discountWeightPerTray = uiState.discountWeightPerTray,
+                                accentColor = accentColor
+                            )
                         }
                     }
                 }
@@ -246,7 +253,13 @@ private fun getSelectionColor(id: Int): Color {
 }
 
 @Composable
-fun TradeSummaryHeader(totalWeight: Double, totalAmount: Int, accentColor: Color) {
+fun TradeSummaryHeader(
+    totalGrossWeight: Double,
+    totalNetWeight: Double,
+    totalAmount: Int,
+    discountWeightPerTray: Double,
+    accentColor: Color
+) {
     val isDarkMode = isSystemInDarkTheme()
     val textColor = when {
         accentColor == Color(0xFFE0E0E0) -> Color.Black
@@ -269,12 +282,17 @@ fun TradeSummaryHeader(totalWeight: Double, totalAmount: Int, accentColor: Color
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = "Peso Bruto Total", style = MaterialTheme.typography.labelMedium)
+                Text(text = "Peso Neto Total", style = MaterialTheme.typography.labelMedium)
                 Text(
-                    text = String.format(Locale.getDefault(), "%.2f kg", totalWeight),
+                    text = String.format(Locale.getDefault(), "%.2f kg", totalNetWeight),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = textColor
+                )
+                Text(
+                    text = String.format(Locale.getDefault(), "Bruto %.2f kg", totalGrossWeight),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             VerticalDivider(modifier = Modifier.height(40.dp))
@@ -285,6 +303,11 @@ fun TradeSummaryHeader(totalWeight: Double, totalAmount: Int, accentColor: Color
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = textColor
+                )
+                Text(
+                    text = String.format(Locale.getDefault(), "Desc. %.2f kg c/u", discountWeightPerTray),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -355,6 +378,7 @@ fun SelectionTypeSelector(
 fun UnitWeightInputForm(
     weight: String,
     amount: String,
+    discountWeightPerTray: Double,
     onWeightChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
     onInsertClick: () -> Unit,
@@ -371,7 +395,10 @@ fun UnitWeightInputForm(
             OutlinedTextField(
                 value = weight,
                 onValueChange = onWeightChange,
-                label = { Text("Peso (kg)") },
+                label = { Text("Peso bruto (kg)") },
+                supportingText = {
+                    Text("Se descontará ${String.format(Locale.getDefault(), "%.2f", discountWeightPerTray)} kg por jaba")
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -407,8 +434,13 @@ fun UnitWeightInputForm(
 }
 
 @Composable
-fun UnitWeightItem(unitWeight: UnitWeightDetail, accentColor: Color) {
-    val pesoPerJaba = if (unitWeight.amount > 0) unitWeight.weight / unitWeight.amount else 0.0
+fun UnitWeightItem(
+    unitWeight: UnitWeightDetail,
+    discountWeightPerTray: Double,
+    accentColor: Color
+) {
+    val discount = unitWeight.amount * discountWeightPerTray
+    val netWeight = (unitWeight.weight - discount).coerceAtLeast(0.0)
     Surface(
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -424,24 +456,24 @@ fun UnitWeightItem(unitWeight: UnitWeightDetail, accentColor: Color) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = String.format(Locale.getDefault(), "%.2f kg", unitWeight.weight),
+                        text = String.format(Locale.getDefault(), "%.2f kg bruto", unitWeight.weight),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
-                        text = " ÷ ${unitWeight.amount} jabas",
+                        text = " - ${unitWeight.amount} jabas",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Text(
-                    text = String.format(Locale.getDefault(), "%.2f kg/jaba", pesoPerJaba),
+                    text = String.format(Locale.getDefault(), "Descuento: %.2f kg", discount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                text = String.format(Locale.getDefault(), "%.2f kg", unitWeight.weight),
+                text = String.format(Locale.getDefault(), "%.2f kg neto", netWeight),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
                 color = if (accentColor == Color(0xFFE0E0E0)) Color.Black else accentColor
@@ -638,8 +670,10 @@ fun TradeSelectionsPreview() {
             tradeId = 123,
             uiState = TradeSelectionsUiState(
                 isLoading = false,
-                totalWeight = 450.5,
+                totalGrossWeight = 450.5,
+                totalNetWeight = 400.5,
                 totalAmount = 25,
+                discountWeightPerTray = 2.0,
                 selectedSelectionTypeId = 2,
                 selections = listOf(
                     SelectionDetail(

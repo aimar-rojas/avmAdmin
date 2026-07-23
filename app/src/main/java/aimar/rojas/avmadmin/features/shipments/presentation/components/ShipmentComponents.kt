@@ -4,6 +4,10 @@ import aimar.rojas.avmadmin.domain.model.Shipment
 import aimar.rojas.avmadmin.domain.model.Trade
 import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsDetailUiState
 import aimar.rojas.avmadmin.features.shipments.presentation.ShipmentsUiState
+import aimar.rojas.avmadmin.ui.components.AvmButtonSize
+import aimar.rojas.avmadmin.ui.components.AvmFormBottomSheet
+import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
+import aimar.rojas.avmadmin.ui.components.AvmSecondaryButton
 import aimar.rojas.avmadmin.utils.DateUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,8 +23,9 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -127,7 +132,7 @@ fun ShipmentCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateShipmentDialog(
+fun CreateShipmentBottomSheet(
     uiState: ShipmentsUiState,
     onDismiss: () -> Unit,
     onStartDateChange: (String) -> Unit,
@@ -203,24 +208,54 @@ fun CreateShipmentDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Nuevo Envío / Carga",
-                color = MaterialTheme.colorScheme.onSurface
-            )
+    val startDateLabel = DateUtils.convertApiToDisplayDate(uiState.createStartDate) ?: "Seleccionar fecha"
+    val endDateLabel = DateUtils.convertApiToDisplayDate(uiState.createEndDate) ?: "Seleccionar fecha"
+    val isClosed = uiState.createStatus == "CLOSED"
+    val previewText = if (isClosed) {
+        "Se creará un envío cerrado del $startDateLabel al $endDateLabel."
+    } else {
+        "Se creará un envío abierto desde $startDateLabel."
+    }
+
+    AvmFormBottomSheet(
+        title = "Nuevo envío",
+        subtitle = "Define el periodo de trabajo antes de registrar compras o ventas.",
+        leadingIcon = Icons.Filled.LocalShipping,
+        onDismiss = onDismiss,
+        footer = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AvmSecondaryButton(
+                    text = "Cancelar",
+                    onClick = onDismiss,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier.weight(1f)
+                )
+                AvmPrimaryButton(
+                    text = "Crear",
+                    onClick = onCreate,
+                    isLoading = uiState.isLoading,
+                    loadingText = "Creando",
+                    leadingIcon = Icons.Filled.Save,
+                    size = AvmButtonSize.Large,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         },
-        text = {
+        content = {
             Column(
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Tipo de envío",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = "Estado del envío",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
                 )
-                
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -228,111 +263,97 @@ fun CreateShipmentDialog(
                     FilterChip(
                         selected = uiState.createStatus == "OPEN",
                         onClick = { onStatusChange("OPEN") },
-                        label = { Text("Nuevo") },
+                        label = { Text("Abierto") },
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
                         selected = uiState.createStatus == "CLOSED",
                         onClick = { onStatusChange("CLOSED") },
-                        label = { Text("Pasado") },
+                        label = { Text("Cerrado") },
                         modifier = Modifier.weight(1f)
                     )
                 }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = uiState.createStartDate,
-                        onValueChange = onStartDateChange,
-                        label = { Text("Fecha de inicio (YYYY-MM-DD)") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
-                    IconButton(
-                        onClick = onShowStartDatePicker,
-                        modifier = Modifier.padding(top = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.CalendarToday,
-                            contentDescription = "Seleccionar fecha de inicio"
-                        )
-                    }
-                }
-                
-                if (uiState.createStatus == "CLOSED") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = uiState.createEndDate,
-                            onValueChange = onEndDateChange,
-                            label = { Text("Fecha de fin (YYYY-MM-DD)") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                            )
-                        )
-                        IconButton(
-                            onClick = onShowEndDatePicker,
-                            modifier = Modifier.padding(top = 8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.CalendarToday,
-                                contentDescription = "Seleccionar fecha de fin"
-                            )
-                        }
-                    }
-                }
-                
-                if (uiState.error != null) {
-                    Text(
-                        text = uiState.error ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onCreate,
-                enabled = !uiState.isLoading,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+
+                ShipmentDateField(
+                    label = "Fecha de inicio",
+                    value = uiState.createStartDate,
+                    displayValue = startDateLabel,
+                    onValueChange = onStartDateChange,
+                    onOpenPicker = onShowStartDatePicker
                 )
-            ) {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
+
+                if (uiState.createStatus == "CLOSED") {
+                    ShipmentDateField(
+                        label = "Fecha de fin",
+                        value = uiState.createEndDate,
+                        displayValue = endDateLabel,
+                        onValueChange = onEndDateChange,
+                        onOpenPicker = onShowEndDatePicker
                     )
-                } else {
-                    Text("Crear")
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Text(
+                        text = previewText,
+                        modifier = Modifier.padding(14.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                uiState.error?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar")
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.surface
+        }
     )
+}
+
+@Composable
+private fun ShipmentDateField(
+    label: String,
+    value: String,
+    displayValue: String,
+    onValueChange: (String) -> Unit,
+    onOpenPicker: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            supportingText = { Text(displayValue) },
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+        IconButton(
+            onClick = onOpenPicker,
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CalendarToday,
+                contentDescription = "Seleccionar $label"
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

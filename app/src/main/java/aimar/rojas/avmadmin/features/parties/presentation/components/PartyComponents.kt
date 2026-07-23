@@ -3,6 +3,8 @@ package aimar.rojas.avmadmin.features.parties.presentation.components
 import aimar.rojas.avmadmin.core.sync.SyncState
 import aimar.rojas.avmadmin.domain.model.Party
 import aimar.rojas.avmadmin.ui.components.AvmActionBottomSheet
+import aimar.rojas.avmadmin.ui.components.AvmButtonSize
+import aimar.rojas.avmadmin.ui.components.AvmFormBottomSheet
 import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 import aimar.rojas.avmadmin.ui.components.AvmSecondaryButton
 import aimar.rojas.avmadmin.ui.components.AvmSheetAction
@@ -18,6 +20,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +33,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -263,33 +269,63 @@ private fun Party.secondaryLine(roleLabel: String): String {
     return listOfNotNull(roleLabel, document).joinToString(" • ")
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreatePartyDialog(
+fun CreatePartyBottomSheet(
     uiState: PartyCreateUiState,
     partyRole: String,
     onDismiss: () -> Unit,
     onAliasNameChange: (String) -> Unit,
+    onFirstNameChange: (String) -> Unit,
+    onLastNameChange: (String) -> Unit,
+    onDniChange: (String) -> Unit,
+    onRucChange: (String) -> Unit,
+    onPhoneChange: (String) -> Unit,
+    onAccountNumberChange: (String) -> Unit,
     onCreate: () -> Unit
 ) {
-    val title = if (partyRole == "producer") "Nuevo Productor" else "Nuevo Comprador"
+    val roleName = if (partyRole == "producer") "productor" else "comprador"
+    val title = if (partyRole == "producer") "Nuevo productor" else "Nuevo comprador"
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
+    AvmFormBottomSheet(
+        title = title,
+        subtitle = "Registra los datos principales para encontrarlo rápido después.",
+        leadingIcon = Icons.Filled.PersonAdd,
+        onDismiss = onDismiss,
+        footer = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                AvmSecondaryButton(
+                    text = "Cancelar",
+                    onClick = onDismiss,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier.weight(1f)
+                )
+                AvmPrimaryButton(
+                    text = "Guardar",
+                    onClick = onCreate,
+                    isLoading = uiState.isLoading,
+                    loadingText = "Guardando",
+                    leadingIcon = Icons.Filled.Save,
+                    size = AvmButtonSize.Large,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        },
+        content = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                FormSectionTitle("Datos principales")
+
                 OutlinedTextField(
                     value = uiState.aliasName,
                     onValueChange = onAliasNameChange,
                     label = { Text("Nombre comercial") },
+                    supportingText = { Text("Ejemplo: Fundo Santa Rosa, Miguel, Comercial AVM") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -298,49 +334,99 @@ fun CreatePartyDialog(
                     )
                 )
 
-                if (uiState.error != null) {
-                    Text(
-                        text = uiState.error ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onCreate,
-                enabled = !uiState.isLoading,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                OutlinedTextField(
+                    value = uiState.firstName,
+                    onValueChange = onFirstNameChange,
+                    label = { Text("Nombre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
                 )
-            ) {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
+
+                OutlinedTextField(
+                    value = uiState.lastName,
+                    onValueChange = onLastNameChange,
+                    label = { Text("Apellido") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                FormSectionTitle("Documento y contacto")
+
+                OutlinedTextField(
+                    value = uiState.dni,
+                    onValueChange = onDniChange,
+                    label = { Text("DNI") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                OutlinedTextField(
+                    value = uiState.ruc,
+                    onValueChange = onRucChange,
+                    label = { Text("RUC") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                OutlinedTextField(
+                    value = uiState.phone,
+                    onValueChange = onPhoneChange,
+                    label = { Text("Teléfono") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                )
+
+                OutlinedTextField(
+                    value = uiState.accountNumber,
+                    onValueChange = onAccountNumberChange,
+                    label = { Text("Nro de cuenta") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Text(
+                    text = "Se guardará como $roleName y quedará pendiente de sincronización si estás sin internet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                uiState.error?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
                     )
-                } else {
-                    Text("Crear")
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar")
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.surface
+        }
     )
 }
 
 data class PartyCreateUiState(
     val aliasName: String = "",
+    val firstName: String = "",
+    val lastName: String = "",
+    val dni: String = "",
+    val ruc: String = "",
+    val phone: String = "",
+    val accountNumber: String = "",
     val isLoading: Boolean = false,
     val error: String? = null
 )
+
+@Composable
+private fun FormSectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary
+    )
+}
 
 data class PartyEditUiState(
     val id: Int = 0,

@@ -65,10 +65,10 @@ class TradeSummaryViewModel @Inject constructor(
                 val trade = tradeResult.getOrNull()
                 val selections = selectionsResult.getOrNull() ?: emptyList()
                 val worked = selections.filter { it.unitWeights.isNotEmpty() }.map { selection ->
-                    val gross = selection.unitWeights.sumOf { it.weight * it.amount }
+                    val gross = selection.unitWeights.sumOf { it.weight }
                     val crates = selection.unitWeights.sumOf { it.amount }
                     val discount = trade?.discountWeightPerTray ?: 0.0
-                    val net = gross - (crates * discount)
+                    val net = (gross - (crates * discount)).coerceAtLeast(0.0)
                     val price = selection.price?.toString() ?: ""
                     val total = if (price.isNotEmpty()) net * (price.toDoubleOrNull() ?: 0.0) else 0.0
                     

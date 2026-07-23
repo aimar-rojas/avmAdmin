@@ -3,19 +3,14 @@ package aimar.rojas.avmadmin.features.parties.presentation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,12 +20,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import aimar.rojas.avmadmin.domain.model.Party
-import aimar.rojas.avmadmin.features.parties.presentation.components.CreatePartyDialog
+import aimar.rojas.avmadmin.features.parties.presentation.components.CreatePartyBottomSheet
 import aimar.rojas.avmadmin.features.parties.presentation.components.PartyCreateUiState
 import aimar.rojas.avmadmin.features.parties.presentation.components.EditPartyBottomSheet
 import aimar.rojas.avmadmin.features.parties.presentation.components.PartyActionsBottomSheet
 import aimar.rojas.avmadmin.features.parties.presentation.components.PartyEditUiState
 import aimar.rojas.avmadmin.features.parties.presentation.components.PartySummaryCard
+import aimar.rojas.avmadmin.ui.components.AvmCatalogHeader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -49,39 +45,25 @@ fun ProducersScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Productores") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Atrás",
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.showCreateDialog() },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar productor")
-            }
-        }
-    ) { paddingValues ->
-        Box(
+    Scaffold { paddingValues ->
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            AvmCatalogHeader(
+                title = "Productores",
+                subtitle = "Personas o negocios que abastecen mercadería.",
+                countLabel = "${uiState.total} registrados",
+                statusLabel = uiState.pendingSyncLabel(),
+                actionText = "Agregar productor",
+                actionIcon = Icons.Filled.Add,
+                leadingIcon = Icons.Filled.Groups,
+                onBackClick = { navController.popBackStack() },
+                onActionClick = { viewModel.showCreateDialog() }
+            )
+
+            Box(modifier = Modifier.fillMaxSize()) {
             when {
                 uiState.isLoading && uiState.parties.isEmpty() -> {
                     CircularProgressIndicator(
@@ -138,14 +120,21 @@ fun ProducersScreen(
                     }
                 }
             }
+            }
         }
 
         if (uiState.showCreateDialog) {
-            CreatePartyDialog(
+            CreatePartyBottomSheet(
                 uiState = uiState.createState,
                 partyRole = "producer",
                 onDismiss = { viewModel.hideCreateDialog() },
                 onAliasNameChange = { viewModel.onAliasNameChange(it) },
+                onFirstNameChange = { viewModel.onCreateFirstNameChange(it) },
+                onLastNameChange = { viewModel.onCreateLastNameChange(it) },
+                onDniChange = { viewModel.onCreateDniChange(it) },
+                onRucChange = { viewModel.onCreateRucChange(it) },
+                onPhoneChange = { viewModel.onCreatePhoneChange(it) },
+                onAccountNumberChange = { viewModel.onCreateAccountNumberChange(it) },
                 onCreate = { viewModel.createParty() }
             )
         }
@@ -190,6 +179,11 @@ data class PartiesUiState(
     val selectedParty: Party? = null,
     val showActionsBottomSheet: Boolean = false
 )
+
+private fun PartiesUiState.pendingSyncLabel(): String {
+    val pendingCount = parties.count { it.syncState != null && it.syncState != aimar.rojas.avmadmin.core.sync.SyncState.CLEAN }
+    return if (pendingCount > 0) "$pendingCount pendientes" else "Sincronizado"
+}
 
 @HiltViewModel
 class ProducersViewModel @Inject constructor(
@@ -239,6 +233,30 @@ class ProducersViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             createState = _uiState.value.createState.copy(aliasName = aliasName)
         )
+    }
+
+    fun onCreateFirstNameChange(value: String) {
+        _uiState.value = _uiState.value.copy(createState = _uiState.value.createState.copy(firstName = value))
+    }
+
+    fun onCreateLastNameChange(value: String) {
+        _uiState.value = _uiState.value.copy(createState = _uiState.value.createState.copy(lastName = value))
+    }
+
+    fun onCreateDniChange(value: String) {
+        _uiState.value = _uiState.value.copy(createState = _uiState.value.createState.copy(dni = value))
+    }
+
+    fun onCreateRucChange(value: String) {
+        _uiState.value = _uiState.value.copy(createState = _uiState.value.createState.copy(ruc = value))
+    }
+
+    fun onCreatePhoneChange(value: String) {
+        _uiState.value = _uiState.value.copy(createState = _uiState.value.createState.copy(phone = value))
+    }
+
+    fun onCreateAccountNumberChange(value: String) {
+        _uiState.value = _uiState.value.copy(createState = _uiState.value.createState.copy(accountNumber = value))
     }
 
     fun onEditAliasNameChange(value: String) {
@@ -316,7 +334,13 @@ class ProducersViewModel @Inject constructor(
 
             partiesRepository.createParty(
                 partyRole = "producer",
-                aliasName = createState.aliasName.takeIf { it.isNotBlank() }
+                aliasName = createState.aliasName.takeIf { it.isNotBlank() },
+                firstName = createState.firstName.takeIf { it.isNotBlank() },
+                lastName = createState.lastName.takeIf { it.isNotBlank() },
+                dni = createState.dni.takeIf { it.isNotBlank() },
+                ruc = createState.ruc.takeIf { it.isNotBlank() },
+                phone = createState.phone.takeIf { it.isNotBlank() },
+                accountNumber = createState.accountNumber.takeIf { it.isNotBlank() }
             )
                 .onSuccess {
                     _uiState.value = currentState.copy(
