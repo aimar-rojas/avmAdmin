@@ -1,7 +1,8 @@
 package aimar.rojas.avmadmin.features.apuntes.presentation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -17,8 +18,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -33,6 +38,31 @@ fun ApuntesHistoryScreen(
     viewModel: ApuntesHistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    var recordToShare by remember { mutableStateOf<Apunte?>(null) }
+
+    recordToShare?.let { record ->
+        AlertDialog(
+            onDismissRequest = { recordToShare = null },
+            title = { Text("Compartir apunte") },
+            text = { Text("¿Quieres compartir este apunte por WhatsApp como imagen?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        shareApunteCardToWhatsApp(context, record)
+                        recordToShare = null
+                    }
+                ) {
+                    Text("Compartir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { recordToShare = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -70,7 +100,8 @@ fun ApuntesHistoryScreen(
                 items(uiState.records) { record: Apunte ->
                     ApunteHistoryCard(
                         record = record,
-                        onClick = { navController.navigate("apuntes/${record.id}") }
+                        onClick = { navController.navigate("apuntes/${record.id}") },
+                        onLongClick = { recordToShare = record }
                     )
                 }
                 item {
@@ -81,10 +112,12 @@ fun ApuntesHistoryScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ApunteHistoryCard(
     record: Apunte,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     val enabledDetails = record.details.filter { it.isEnabled && it.jabaCount > 0 }
     val detailsByType = enabledDetails.associateBy { it.selectionTypeId }
@@ -93,7 +126,10 @@ fun ApunteHistoryCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
