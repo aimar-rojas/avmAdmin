@@ -3,9 +3,9 @@ package aimar.rojas.avmadmin.features.parties.presentation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,11 +28,9 @@ import aimar.rojas.avmadmin.domain.model.Party
 import aimar.rojas.avmadmin.features.parties.presentation.components.CreatePartyDialog
 import aimar.rojas.avmadmin.features.parties.presentation.components.PartyCreateUiState
 import aimar.rojas.avmadmin.features.parties.presentation.components.EditPartyBottomSheet
+import aimar.rojas.avmadmin.features.parties.presentation.components.PartyActionsBottomSheet
 import aimar.rojas.avmadmin.features.parties.presentation.components.PartyEditUiState
-import androidx.compose.foundation.clickable
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.ui.text.font.FontWeight
+import aimar.rojas.avmadmin.features.parties.presentation.components.PartySummaryCard
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -58,7 +56,7 @@ fun ProducersScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Atrás",
                         )
                     }
@@ -130,9 +128,10 @@ fun ProducersScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(uiState.parties) { party ->
-                                PartyCard(
+                                PartySummaryCard(
                                     party = party,
-                                    onClick = { viewModel.showEditBottomSheet(party) }
+                                    roleLabel = "Productor",
+                                    onClick = { viewModel.showActionsBottomSheet(party) }
                                 )
                             }
                         }
@@ -149,6 +148,17 @@ fun ProducersScreen(
                 onAliasNameChange = { viewModel.onAliasNameChange(it) },
                 onCreate = { viewModel.createParty() }
             )
+        }
+
+        uiState.selectedParty?.let { party ->
+            if (uiState.showActionsBottomSheet) {
+                PartyActionsBottomSheet(
+                    party = party,
+                    roleLabel = "Productor",
+                    onDismiss = { viewModel.hideActionsBottomSheet() },
+                    onEdit = { viewModel.showEditBottomSheetFromActions(party) }
+                )
+            }
         }
 
         if (uiState.showEditBottomSheet) {
@@ -168,42 +178,6 @@ fun ProducersScreen(
     }
 }
 
-@Composable
-private fun PartyCard(party: Party, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = party.aliasName ?: "${party.firstName} ${party.lastName.orEmpty()}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            if (!party.firstName.isNullOrBlank() || !party.lastName.isNullOrBlank()) {
-                Text(
-                    text = listOfNotNull(party.firstName, party.lastName).joinToString(" "),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            listOfNotNull(
-                party.dni?.let { "DNI: $it" },
-                party.ruc?.let { "RUC: $it" },
-                party.phone?.let { "Tel: $it" }
-            ).forEach { line ->
-                Text(
-                    text = line,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
 data class PartiesUiState(
     val parties: List<Party> = emptyList(),
     val isLoading: Boolean = false,
@@ -212,7 +186,9 @@ data class PartiesUiState(
     val showCreateDialog: Boolean = false,
     val createState: PartyCreateUiState = PartyCreateUiState(),
     val showEditBottomSheet: Boolean = false,
-    val editState: PartyEditUiState = PartyEditUiState()
+    val editState: PartyEditUiState = PartyEditUiState(),
+    val selectedParty: Party? = null,
+    val showActionsBottomSheet: Boolean = false
 )
 
 @HiltViewModel
@@ -291,6 +267,22 @@ class ProducersViewModel @Inject constructor(
 
     fun onEditAccountNumberChange(value: String) {
         _uiState.value = _uiState.value.copy(editState = _uiState.value.editState.copy(accountNumber = value))
+    }
+
+    fun showActionsBottomSheet(party: Party) {
+        _uiState.value = _uiState.value.copy(
+            selectedParty = party,
+            showActionsBottomSheet = true
+        )
+    }
+
+    fun hideActionsBottomSheet() {
+        _uiState.value = _uiState.value.copy(showActionsBottomSheet = false)
+    }
+
+    fun showEditBottomSheetFromActions(party: Party) {
+        _uiState.value = _uiState.value.copy(showActionsBottomSheet = false)
+        showEditBottomSheet(party)
     }
 
     fun showEditBottomSheet(party: Party) {
@@ -392,4 +384,3 @@ class ProducersViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(error = null)
     }
 }
-
