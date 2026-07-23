@@ -17,6 +17,7 @@ data class ApunteEntity(
     val localId: Int = 0,
     val remoteId: Int? = null,
     val userId: Int = 0,
+    val authorName: String? = null,
     val recordDate: String,
     val observations: String?,
     val syncState: String = SyncState.CLEAN,

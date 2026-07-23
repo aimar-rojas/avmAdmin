@@ -1,6 +1,7 @@
 package aimar.rojas.avmadmin.features.apuntes.data
 
 import aimar.rojas.avmadmin.core.sync.SyncState
+import aimar.rojas.avmadmin.data.local.SessionDataStore
 import aimar.rojas.avmadmin.features.apuntes.data.local.ApuntesDao
 import aimar.rojas.avmadmin.features.apuntes.data.local.entities.ApunteEntity
 import aimar.rojas.avmadmin.features.apuntes.domain.ApuntesRepository
@@ -9,17 +10,26 @@ import aimar.rojas.avmadmin.features.apuntes.domain.model.ApunteDetail
 import aimar.rojas.avmadmin.utils.DateUtils
 import android.util.Log
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
 class ApuntesRepositoryImpl @Inject constructor(
     private val apiService: ApuntesApiService,
-    private val apuntesDao: ApuntesDao
+    private val apuntesDao: ApuntesDao,
+    private val sessionDataStore: SessionDataStore
 ) : ApuntesRepository {
 
     override fun observeApuntes(): Flow<List<Apunte>> {
-        return apuntesDao.observeApuntesWithDetails().map { records ->
-            records.map { it.toDomain() }
+        return combine(
+            apuntesDao.observeApuntesWithDetails(),
+            sessionDataStore.userFlow
+        ) { records, user ->
+            records
+                .filter { record ->
+                    record.apunte.userId == user?.id ||
+                        (record.apunte.remoteId == null && record.apunte.userId == 0)
+                }
+                .map { it.toDomain() }
         }
     }
 
@@ -37,9 +47,9 @@ class ApuntesRepositoryImpl @Inject constructor(
                             dto.details.orEmpty().map { it.toEntity(existing?.localId ?: 0) }
                         )
                     }
-                    Result.success(apuntesDao.getApuntesWithDetails().map { it.toDomain() })
+                    Result.success(getOwnLocalApuntes())
                 } else {
-                    val localRecords = apuntesDao.getApuntesWithDetails().map { it.toDomain() }
+                    val localRecords = getOwnLocalApuntes()
                     if (localRecords.isNotEmpty()) {
                         Log.w(TAG, "Remote apuntes history returned an empty body; showing local records.")
                         Result.success(localRecords)
@@ -49,7 +59,7 @@ class ApuntesRepositoryImpl @Inject constructor(
                 }
             } else {
                 val error = response.errorBody()?.string()
-                val localRecords = apuntesDao.getApuntesWithDetails().map { it.toDomain() }
+                val localRecords = getOwnLocalApuntes()
                 Log.w(TAG, "Remote apuntes history failed. http=${response.code()}, error=$error, localCount=${localRecords.size}")
                 if (localRecords.isNotEmpty()) {
                     Result.success(localRecords)
@@ -58,7 +68,7 @@ class ApuntesRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            val localRecords = apuntesDao.getApuntesWithDetails().map { it.toDomain() }
+            val localRecords = getOwnLocalApuntes()
             Log.e(TAG, "Remote apuntes history threw an exception; showing local records if available.", e)
             if (localRecords.isNotEmpty()) {
                 Result.success(localRecords)
@@ -71,6 +81,11 @@ class ApuntesRepositoryImpl @Inject constructor(
     override suspend fun getApunteById(localId: Int): Result<Apunte> {
         val record = apuntesDao.getApunteWithDetailsById(localId)
             ?: return Result.failure(Exception("Apunte no encontrado"))
+        val currentUser = sessionDataStore.getUser()
+        val isLegacyLocalRecord = record.apunte.remoteId == null && record.apunte.userId == 0
+        if (!isLegacyLocalRecord && record.apunte.userId != currentUser?.id) {
+            return Result.failure(Exception("Apunte no encontrado"))
+        }
         return Result.success(record.toDomain())
     }
 
@@ -89,8 +104,11 @@ class ApuntesRepositoryImpl @Inject constructor(
                 )
             }
         )
+        val currentUser = sessionDataStore.getUser()
         val localId = apuntesDao.insertRecordWithDetails(
             ApunteEntity(
+                userId = currentUser?.id ?: 0,
+                authorName = currentUser?.username,
                 recordDate = now,
                 observations = observations,
                 syncState = SyncState.PENDING_CREATE
@@ -141,6 +159,11 @@ class ApuntesRepositoryImpl @Inject constructor(
     ): Result<Apunte> {
         val existing = apuntesDao.getApunteWithDetailsById(localId)
             ?: return Result.failure(Exception("Apunte no encontrado"))
+        val currentUser = sessionDataStore.getUser()
+        val isLegacyLocalRecord = existing.apunte.remoteId == null && existing.apunte.userId == 0
+        if (!isLegacyLocalRecord && currentUser?.id != existing.apunte.userId) {
+            return Result.failure(Exception("Solo el autor puede editar este apunte"))
+        }
         val pendingState = if (existing.apunte.remoteId == null) {
             SyncState.PENDING_CREATE
         } else {
@@ -213,6 +236,16 @@ class ApuntesRepositoryImpl @Inject constructor(
                 )
             }
         )
+    }
+
+    private suspend fun getOwnLocalApuntes(): List<Apunte> {
+        val currentUser = sessionDataStore.getUser()
+        return apuntesDao.getApuntesWithDetails()
+            .filter { record ->
+                record.apunte.userId == currentUser?.id ||
+                    (record.apunte.remoteId == null && record.apunte.userId == 0)
+            }
+            .map { it.toDomain() }
     }
 
     companion object {

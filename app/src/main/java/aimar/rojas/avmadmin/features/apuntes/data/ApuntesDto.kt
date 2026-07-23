@@ -16,7 +16,14 @@ data class ApunteDto(
     @SerializedName("user_id") val userId: Int,
     @SerializedName("record_date") val recordDate: String,
     @SerializedName("observations") val observations: String?,
-    @SerializedName("details") val details: List<ApunteDetailDto>?
+    @SerializedName("details") val details: List<ApunteDetailDto>?,
+    @SerializedName("user") val user: ApunteUserDto? = null
+)
+
+data class ApunteUserDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("username") val username: String?,
+    @SerializedName("email") val email: String?
 )
 
 data class ApunteDetailDto(

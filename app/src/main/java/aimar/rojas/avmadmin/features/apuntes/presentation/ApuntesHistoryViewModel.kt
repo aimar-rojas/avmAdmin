@@ -59,4 +59,5 @@ class ApuntesHistoryViewModel @Inject constructor(
             }
         }
     }
+
 }

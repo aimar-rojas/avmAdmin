@@ -6,6 +6,7 @@ data class Apunte(
     val id: Int,
     val remoteId: Int? = null,
     val userId: Int,
+    val authorName: String? = null,
     val recordDate: String,
     val observations: String?,
     val details: List<ApunteDetail>,

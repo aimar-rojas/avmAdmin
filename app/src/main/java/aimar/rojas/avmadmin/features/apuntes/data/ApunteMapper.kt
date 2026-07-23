@@ -12,6 +12,7 @@ fun ApunteDto.toDomain(): Apunte {
         id = id,
         remoteId = id,
         userId = userId,
+        authorName = user?.displayName(),
         recordDate = recordDate,
         observations = observations,
         details = details?.map { it.toDomain() } ?: emptyList(),
@@ -35,6 +36,7 @@ fun ApunteWithDetails.toDomain(): Apunte {
         id = apunte.localId,
         remoteId = apunte.remoteId,
         userId = apunte.userId,
+        authorName = apunte.authorName,
         recordDate = apunte.recordDate,
         observations = apunte.observations,
         details = details.map { it.toDomain() },
@@ -63,6 +65,7 @@ fun ApunteDto.toEntity(
         localId = localId,
         remoteId = id,
         userId = userId,
+        authorName = user?.displayName(),
         recordDate = recordDate,
         observations = observations,
         syncState = syncState,
@@ -92,4 +95,9 @@ fun ApunteDetail.toEntity(apunteLocalId: Int): ApunteDetailEntity {
         jabaCount = jabaCount,
         isEnabled = isEnabled
     )
+}
+
+private fun ApunteUserDto.displayName(): String? {
+    return username?.takeIf { it.isNotBlank() }
+        ?: email?.substringBefore("@")?.takeIf { it.isNotBlank() }
 }

@@ -8,9 +8,9 @@ object ApunteSelectionDefaults {
         SelectionTypeInfo(2, "Verde"),
         SelectionTypeInfo(3, "Blanco"),
         SelectionTypeInfo(7, "Morado"),
-        SelectionTypeInfo(4, "Rojo / rosado"),
         SelectionTypeInfo(6, "Azul"),
         SelectionTypeInfo(5, "Naranja"),
+        SelectionTypeInfo(4, "Rojo / rosado"),
         SelectionTypeInfo(8, "Amarillo"),
         SelectionTypeInfo(1, "Sin pita")
     )
