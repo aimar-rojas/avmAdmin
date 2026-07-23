@@ -21,11 +21,17 @@ interface PartyDao {
     @Query("SELECT * FROM parties WHERE remoteId = :remoteId LIMIT 1")
     suspend fun getPartyByRemoteId(remoteId: Int): PartyEntity?
 
-    @Query("SELECT * FROM parties WHERE syncState != 'CLEAN' ORDER BY localId ASC")
+    @Query("SELECT * FROM parties WHERE syncState != 'CLEAN' AND syncState != 'CONFLICT' ORDER BY localId ASC")
     suspend fun getPendingSyncParties(): List<PartyEntity>
+
+    @Query("SELECT * FROM parties WHERE syncState != 'CLEAN' ORDER BY localId ASC")
+    fun observePendingSyncParties(): Flow<List<PartyEntity>>
 
     @Query("SELECT COUNT(*) FROM parties WHERE syncState != 'CLEAN'")
     fun observePendingCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM parties WHERE syncState != 'CLEAN'")
+    suspend fun getPendingCount(): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertParty(party: PartyEntity): Long

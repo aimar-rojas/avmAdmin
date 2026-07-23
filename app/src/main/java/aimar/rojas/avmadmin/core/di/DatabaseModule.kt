@@ -1,6 +1,7 @@
 package aimar.rojas.avmadmin.core.di
 
 import aimar.rojas.avmadmin.core.data.local.AvmDatabase
+import aimar.rojas.avmadmin.features.apuntes.data.local.ApuntesDao
 import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
 import aimar.rojas.avmadmin.features.parties.data.local.PartyDao
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentDao
@@ -252,6 +253,43 @@ object DatabaseModule {
         }
     }
 
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `apuntes` (
+                    `localId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `remoteId` INTEGER,
+                    `userId` INTEGER NOT NULL,
+                    `recordDate` TEXT NOT NULL,
+                    `observations` TEXT,
+                    `syncState` TEXT NOT NULL,
+                    `lastSyncAttemptAt` TEXT,
+                    `lastSyncedAt` TEXT,
+                    `serverUpdatedAt` TEXT,
+                    `syncError` TEXT
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `apunte_details` (
+                    `localId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `remoteId` INTEGER,
+                    `apunteLocalId` INTEGER NOT NULL,
+                    `selectionTypeId` INTEGER NOT NULL,
+                    `jabaCount` INTEGER NOT NULL,
+                    `isEnabled` INTEGER NOT NULL,
+                    FOREIGN KEY(`apunteLocalId`) REFERENCES `apuntes`(`localId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_apuntes_remoteId` ON `apuntes` (`remoteId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_apunte_details_apunteLocalId` ON `apunte_details` (`apunteLocalId`)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_apunte_details_remoteId` ON `apunte_details` (`remoteId`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideAvmDatabase(@ApplicationContext context: Context): AvmDatabase {
@@ -259,8 +297,8 @@ object DatabaseModule {
             context,
             AvmDatabase::class.java,
             "avm_database"
-        ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
-         .fallbackToDestructiveMigration()
+        ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+         .fallbackToDestructiveMigration(dropAllTables = true)
          .build()
     }
 
@@ -286,5 +324,11 @@ object DatabaseModule {
     @Singleton
     fun provideTradeDao(database: AvmDatabase): TradeDao {
         return database.tradeDao
+    }
+
+    @Provides
+    @Singleton
+    fun provideApuntesDao(database: AvmDatabase): ApuntesDao {
+        return database.apuntesDao
     }
 }

@@ -8,6 +8,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SelectionDao {
@@ -63,9 +64,15 @@ interface SelectionDao {
     @Query("SELECT COUNT(*) FROM selections WHERE syncState != 'CLEAN'")
     fun observePendingCount(): kotlinx.coroutines.flow.Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM selections WHERE syncState != 'CLEAN'")
+    suspend fun getPendingCount(): Int
+
     @Transaction
-    @Query("SELECT * FROM selections WHERE syncState != 'CLEAN' ORDER BY localId ASC")
+    @Query("SELECT * FROM selections WHERE syncState != 'CLEAN' AND syncState != 'CONFLICT' ORDER BY localId ASC")
     suspend fun getPendingSelections(): List<SelectionWithUnitWeights>
+
+    @Query("SELECT * FROM selections WHERE syncState != 'CLEAN' ORDER BY localId ASC")
+    fun observePendingSelectionEntities(): Flow<List<SelectionEntity>>
 
     @Transaction
     @Query("SELECT * FROM selections WHERE tradeLocalId = :tradeId AND syncState != 'CLEAN'")

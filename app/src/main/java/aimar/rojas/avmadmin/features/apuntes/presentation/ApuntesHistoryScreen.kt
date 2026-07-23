@@ -1,6 +1,7 @@
 package aimar.rojas.avmadmin.features.apuntes.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -9,7 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -20,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import aimar.rojas.avmadmin.core.sync.SyncState
 import aimar.rojas.avmadmin.features.apuntes.domain.model.Apunte
 import aimar.rojas.avmadmin.features.selections.presentation.SelectionTypeInfo
 
@@ -37,7 +39,7 @@ fun ApuntesHistoryScreen(
                 title = { Text("Historial de Apuntes", style = MaterialTheme.typography.headlineMedium) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Volver", modifier = Modifier.size(32.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", modifier = Modifier.size(32.dp))
                     }
                 }
             )
@@ -65,7 +67,10 @@ fun ApuntesHistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(uiState.records) { record: Apunte ->
-                    ApunteHistoryCard(record = record)
+                    ApunteHistoryCard(
+                        record = record,
+                        onClick = { navController.navigate("apuntes/${record.id}") }
+                    )
                 }
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
@@ -76,7 +81,10 @@ fun ApuntesHistoryScreen(
 }
 
 @Composable
-fun ApunteHistoryCard(record: Apunte) {
+fun ApunteHistoryCard(
+    record: Apunte,
+    onClick: () -> Unit
+) {
     val selectionTypes = listOf(
         SelectionTypeInfo(1, "Sin pita"),
         SelectionTypeInfo(2, "Verde"),
@@ -89,7 +97,9 @@ fun ApunteHistoryCard(record: Apunte) {
     )
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
@@ -99,6 +109,31 @@ fun ApunteHistoryCard(record: Apunte) {
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
+
+            if (record.syncState != SyncState.CLEAN) {
+                Spacer(modifier = Modifier.height(8.dp))
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            text = record.syncState.toReadableApunteSyncState(),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        labelColor = if (record.syncState.startsWith("FAILED")) {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        },
+                        containerColor = if (record.syncState.startsWith("FAILED")) {
+                            MaterialTheme.colorScheme.errorContainer
+                        } else {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        }
+                    )
+                )
+            }
             
             if (!record.observations.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -157,9 +192,19 @@ private fun getSelectionColor(id: Int): androidx.compose.ui.graphics.Color {
 private fun formatToTextDate(dateStr: String): String {
     return try {
         val date = LocalDate.parse(dateStr.take(10))
-        val formatter = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'del' yyyy", Locale("es", "ES"))
+        val formatter = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'del' yyyy", Locale.forLanguageTag("es-ES"))
         date.format(formatter)
     } catch (e: Exception) {
         dateStr
+    }
+}
+
+private fun String.toReadableApunteSyncState(): String {
+    return when (this) {
+        SyncState.PENDING_CREATE -> "Pendiente de sincronizar"
+        SyncState.FAILED_CREATE -> "Falló al sincronizar"
+        SyncState.SYNCING -> "Sincronizando"
+        SyncState.CONFLICT -> "Conflicto de sincronización"
+        else -> "Pendiente de sincronizar"
     }
 }

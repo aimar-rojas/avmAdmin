@@ -21,11 +21,17 @@ interface ShipmentDao {
     @Query("SELECT * FROM shipments WHERE remoteId = :remoteId LIMIT 1")
     suspend fun getShipmentByRemoteId(remoteId: Int): ShipmentEntity?
 
-    @Query("SELECT * FROM shipments WHERE syncState != 'CLEAN' ORDER BY startDate DESC")
+    @Query("SELECT * FROM shipments WHERE syncState != 'CLEAN' AND syncState != 'CONFLICT' ORDER BY startDate DESC")
     suspend fun getPendingSyncShipments(): List<ShipmentEntity>
+
+    @Query("SELECT * FROM shipments WHERE syncState != 'CLEAN' ORDER BY startDate DESC")
+    fun observePendingSyncShipments(): Flow<List<ShipmentEntity>>
 
     @Query("SELECT COUNT(*) FROM shipments WHERE syncState != 'CLEAN'")
     fun observePendingCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM shipments WHERE syncState != 'CLEAN'")
+    suspend fun getPendingCount(): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertShipment(shipment: ShipmentEntity): Long

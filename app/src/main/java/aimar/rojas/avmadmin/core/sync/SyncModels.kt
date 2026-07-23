@@ -4,10 +4,11 @@ data class SyncEntitySummary(
     val partyPending: Int = 0,
     val shipmentPending: Int = 0,
     val tradePending: Int = 0,
-    val selectionPending: Int = 0
+    val selectionPending: Int = 0,
+    val apuntePending: Int = 0
 ) {
     val totalPending: Int
-        get() = partyPending + shipmentPending + tradePending + selectionPending
+        get() = partyPending + shipmentPending + tradePending + selectionPending + apuntePending
 }
 
 data class SyncResultSummary(
@@ -15,6 +16,7 @@ data class SyncResultSummary(
     val pushedShipments: Int = 0,
     val pushedTrades: Int = 0,
     val pushedSelections: Int = 0,
+    val pushedApuntes: Int = 0,
     val failedItems: Int = 0
 )
 

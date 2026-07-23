@@ -14,7 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,12 +35,18 @@ fun ApuntesScreen(
     viewModel: ApuntesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isEditing = uiState.editingApunteId != null
 
     if (uiState.isSuccess) {
         AlertDialog(
             onDismissRequest = { viewModel.clearSuccess() },
             title = { Text("Éxito", style = MaterialTheme.typography.headlineSmall) },
-            text = { Text("Apunte guardado correctamente.", style = MaterialTheme.typography.bodyLarge) },
+            text = {
+                Text(
+                    if (isEditing) "Apunte actualizado correctamente." else "Apunte guardado correctamente.",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearSuccess() }) {
                     Text("OK", style = MaterialTheme.typography.bodyLarge)
@@ -65,15 +71,22 @@ fun ApuntesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Nuevo Apunte", style = MaterialTheme.typography.headlineMedium) },
+                title = {
+                    Text(
+                        if (isEditing) "Editar Apunte" else "Nuevo Apunte",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Volver", modifier = Modifier.size(32.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", modifier = Modifier.size(32.dp))
                     }
                 },
                 actions = {
-                    IconButton(onClick = { navController.navigate("apuntes_history") }) {
-                        Icon(Icons.Filled.History, contentDescription = "Historial", modifier = Modifier.size(32.dp))
+                    if (!isEditing) {
+                        IconButton(onClick = { navController.navigate("apuntes_history") }) {
+                            Icon(Icons.Filled.History, contentDescription = "Historial", modifier = Modifier.size(32.dp))
+                        }
                     }
                 }
             )
@@ -178,7 +191,7 @@ fun ApuntesScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             AvmPrimaryButton(
-                text = "GUARDAR APUNTE",
+                text = if (isEditing) "ACTUALIZAR APUNTE" else "GUARDAR APUNTE",
                 onClick = { viewModel.saveApunte() },
                 modifier = Modifier
                     .fillMaxWidth()

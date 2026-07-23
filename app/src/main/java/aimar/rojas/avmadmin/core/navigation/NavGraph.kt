@@ -15,6 +15,7 @@ import aimar.rojas.avmadmin.features.selections.presentation.TradeSelectionsScre
 import aimar.rojas.avmadmin.features.selections.presentation.TradeSummaryScreen
 import aimar.rojas.avmadmin.features.apuntes.presentation.ApuntesScreen
 import aimar.rojas.avmadmin.features.apuntes.presentation.ApuntesHistoryScreen
+import aimar.rojas.avmadmin.features.sync.presentation.PendingSyncScreen
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
@@ -78,8 +79,19 @@ fun NavGraph(
             ApuntesScreen(navController = navController)
         }
 
+        composable(
+            route = "apuntes/{apunteId}",
+            arguments = listOf(navArgument("apunteId") { type = NavType.IntType })
+        ) {
+            ApuntesScreen(navController = navController)
+        }
+
         composable("apuntes_history") {
             ApuntesHistoryScreen(navController = navController)
+        }
+
+        composable("sync_pending") {
+            PendingSyncScreen(navController = navController)
         }
     }
 }

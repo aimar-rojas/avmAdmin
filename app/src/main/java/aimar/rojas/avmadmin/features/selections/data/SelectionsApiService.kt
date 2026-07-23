@@ -13,7 +13,8 @@ interface SelectionsApiService {
     @GET("v1/selections")
     suspend fun getSelections(
         @Query("trade_id") tradeId: Int? = null,
-        @Query("selection_type_id") selectionTypeId: Int? = null
+        @Query("selection_type_id") selectionTypeId: Int? = null,
+        @Query("updated_after") updatedAfter: String? = null
     ): Response<SelectionsResponseDto>
 
     @POST("v1/selections")

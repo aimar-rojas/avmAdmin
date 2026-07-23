@@ -21,11 +21,17 @@ interface TradeDao {
     @Query("SELECT * FROM trades WHERE remoteId = :remoteId LIMIT 1")
     suspend fun getTradeByRemoteId(remoteId: Int): TradeEntity?
 
-    @Query("SELECT * FROM trades WHERE syncState != 'CLEAN' ORDER BY localId ASC")
+    @Query("SELECT * FROM trades WHERE syncState != 'CLEAN' AND syncState != 'CONFLICT' ORDER BY localId ASC")
     suspend fun getPendingSyncTrades(): List<TradeEntity>
+
+    @Query("SELECT * FROM trades WHERE syncState != 'CLEAN' ORDER BY localId ASC")
+    fun observePendingSyncTrades(): Flow<List<TradeEntity>>
 
     @Query("SELECT COUNT(*) FROM trades WHERE syncState != 'CLEAN'")
     fun observePendingCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM trades WHERE syncState != 'CLEAN'")
+    suspend fun getPendingCount(): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTrade(trade: TradeEntity): Long

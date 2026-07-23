@@ -5,6 +5,7 @@ object SyncState {
     const val PENDING_CREATE = "PENDING_CREATE"
     const val PENDING_UPDATE = "PENDING_UPDATE"
     const val SYNCING = "SYNCING"
+    const val CONFLICT = "CONFLICT"
     const val FAILED_CREATE = "FAILED_CREATE"
     const val FAILED_UPDATE = "FAILED_UPDATE"
 

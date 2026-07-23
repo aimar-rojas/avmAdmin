@@ -1,5 +1,8 @@
 package aimar.rojas.avmadmin.core.data.local
 
+import aimar.rojas.avmadmin.features.apuntes.data.local.ApuntesDao
+import aimar.rojas.avmadmin.features.apuntes.data.local.entities.ApunteDetailEntity
+import aimar.rojas.avmadmin.features.apuntes.data.local.entities.ApunteEntity
 import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
 import aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionEntity
 import aimar.rojas.avmadmin.features.selections.data.local.entities.UnitWeightEntity
@@ -21,9 +24,11 @@ import androidx.room.TypeConverters
         UnitWeightEntity::class,
         PartyEntity::class,
         ShipmentEntity::class,
-        TradeEntity::class
+        TradeEntity::class,
+        ApunteEntity::class,
+        ApunteDetailEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -32,4 +37,5 @@ abstract class AvmDatabase : RoomDatabase() {
     abstract val partyDao: PartyDao
     abstract val shipmentDao: ShipmentDao
     abstract val tradeDao: TradeDao
+    abstract val apuntesDao: ApuntesDao
 }

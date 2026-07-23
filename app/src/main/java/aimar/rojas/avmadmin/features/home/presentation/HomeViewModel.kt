@@ -38,12 +38,17 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun logout(onLogoutSuccess: () -> Unit, onLogoutError: (String) -> Unit) {
+    fun logout(onLogoutSuccess: () -> Unit) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoggingOut = true) }
+            _uiState.update {
+                it.copy(
+                    isLoggingOut = true,
+                    showPendingLogoutDialog = false,
+                    logoutError = null
+                )
+            }
             val status = manualSyncManager.status.value
-            val totalPending = status.summary.partyPending + status.summary.shipmentPending + 
-                               status.summary.tradePending + status.summary.selectionPending
+            val totalPending = status.summary.totalPending
             
             if (totalPending > 0) {
                 val syncResult = manualSyncManager.syncNow()
@@ -51,8 +56,13 @@ class HomeViewModel @Inject constructor(
                     authRepository.logout()
                     onLogoutSuccess()
                 } else {
-                    _uiState.update { it.copy(isLoggingOut = false) }
-                    onLogoutError("No se puede cerrar sesión. Tienes datos pendientes de sincronizar y la sincronización falló. Por favor, conéctate a internet e inténtalo de nuevo.")
+                    _uiState.update {
+                        it.copy(
+                            isLoggingOut = false,
+                            showPendingLogoutDialog = true,
+                            logoutError = syncResult.message ?: "No se pudo sincronizar antes de cerrar sesión."
+                        )
+                    }
                 }
             } else {
                 authRepository.logout()
@@ -61,8 +71,27 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun clearLogoutError() {
-        _uiState.update { it.copy(logoutError = null) }
+    fun dismissPendingLogoutDialog() {
+        _uiState.update {
+            it.copy(
+                showPendingLogoutDialog = false,
+                logoutError = null,
+                isLoggingOut = false
+            )
+        }
+    }
+
+    fun forceLogout(onLogoutSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoggingOut = true,
+                    showPendingLogoutDialog = false
+                )
+            }
+            authRepository.logout()
+            onLogoutSuccess()
+        }
     }
 
     private fun observeSyncStatus() {
@@ -84,5 +113,6 @@ data class HomeUiState(
     val user: aimar.rojas.avmadmin.domain.model.User? = null,
     val syncStatus: SyncStatus = SyncStatus(),
     val logoutError: String? = null,
+    val showPendingLogoutDialog: Boolean = false,
     val isLoggingOut: Boolean = false
 )

@@ -76,4 +76,10 @@ object DateUtils {
             null
         }
     }
+
+    fun currentUtcSyncTimestamp(): String {
+        return SimpleDateFormat(syncTimestampPattern, Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.format(Date())
+    }
 }

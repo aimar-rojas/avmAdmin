@@ -41,19 +41,29 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    if (uiState.logoutError != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.clearLogoutError() },
-            icon = { Icon(Icons.Filled.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Error al cerrar sesión") },
-            text = { Text(uiState.logoutError!!) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.clearLogoutError() }) {
-                    Text("Entendido")
+    PendingLogoutDialog(
+        showDialog = uiState.showPendingLogoutDialog,
+        message = uiState.logoutError,
+        onDismiss = viewModel::dismissPendingLogoutDialog,
+        onRetry = {
+            viewModel.logout(
+                onLogoutSuccess = {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
-            }
-        )
-    }
+            )
+        },
+        onForceLogout = {
+            viewModel.forceLogout(
+                onLogoutSuccess = {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+    )
 
     Column(
         modifier = Modifier
@@ -164,7 +174,8 @@ fun HomeScreen(
             hasSyncProblem = hasSyncProblem,
             containerColor = syncContainerColor,
             contentColor = syncContentColor,
-            onSyncClick = { viewModel.syncNow() }
+            onSyncClick = { viewModel.syncNow() },
+            onPendingDetailsClick = { navController.navigate("sync_pending") }
         )
 
         AvmSecondaryButton(
@@ -175,9 +186,6 @@ fun HomeScreen(
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
-                    },
-                    onLogoutError = {
-                        // Ya manejado por el diálogo al actualizar el state
                     }
                 )
             },
@@ -188,6 +196,57 @@ fun HomeScreen(
             leadingIcon = Icons.AutoMirrored.Filled.Logout
         )
     }
+}
+
+@Composable
+private fun PendingLogoutDialog(
+    showDialog: Boolean,
+    message: String?,
+    onDismiss: () -> Unit,
+    onRetry: () -> Unit,
+    onForceLogout: () -> Unit
+) {
+    if (!showDialog) return
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.Error,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = { Text("Datos pendientes sin sincronizar") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = message ?: "No se pudo sincronizar antes de cerrar sesión.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "Si cierras sin sincronizar, los cambios pendientes se borrarán de este dispositivo.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onRetry) {
+                Text("Reintentar")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onDismiss) {
+                    Text("Quedarse")
+                }
+                TextButton(onClick = onForceLogout) {
+                    Text("Cerrar sin sincronizar")
+                }
+            }
+        }
+    )
 }
 
 @Composable
@@ -296,7 +355,8 @@ private fun SyncStatusPanel(
     hasSyncProblem: Boolean,
     containerColor: Color,
     contentColor: Color,
-    onSyncClick: () -> Unit
+    onSyncClick: () -> Unit,
+    onPendingDetailsClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -374,6 +434,14 @@ private fun SyncStatusPanel(
                 modifier = Modifier.fillMaxWidth(),
                 containerColor = if (hasSyncProblem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             )
+
+            if (totalPending > 0) {
+                AvmSecondaryButton(
+                    text = "Ver datos pendientes",
+                    onClick = onPendingDetailsClick,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
