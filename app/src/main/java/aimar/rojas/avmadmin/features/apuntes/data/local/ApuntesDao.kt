@@ -17,6 +17,10 @@ interface ApuntesDao {
     suspend fun getApuntesWithDetails(): List<ApunteWithDetails>
 
     @Transaction
+    @Query("SELECT * FROM apuntes ORDER BY recordDate DESC, localId DESC")
+    fun observeApuntesWithDetails(): Flow<List<ApunteWithDetails>>
+
+    @Transaction
     @Query("SELECT * FROM apuntes WHERE localId = :localId LIMIT 1")
     suspend fun getApunteWithDetailsById(localId: Int): ApunteWithDetails?
 

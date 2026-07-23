@@ -8,12 +8,20 @@ import aimar.rojas.avmadmin.features.apuntes.domain.model.Apunte
 import aimar.rojas.avmadmin.features.apuntes.domain.model.ApunteDetail
 import aimar.rojas.avmadmin.utils.DateUtils
 import android.util.Log
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class ApuntesRepositoryImpl @Inject constructor(
     private val apiService: ApuntesApiService,
     private val apuntesDao: ApuntesDao
 ) : ApuntesRepository {
+
+    override fun observeApuntes(): Flow<List<Apunte>> {
+        return apuntesDao.observeApuntesWithDetails().map { records ->
+            records.map { it.toDomain() }
+        }
+    }
 
     override suspend fun getApuntes(): Result<List<Apunte>> {
         return try {

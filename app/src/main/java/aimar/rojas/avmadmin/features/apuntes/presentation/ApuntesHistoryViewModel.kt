@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -27,17 +28,34 @@ class ApuntesHistoryViewModel @Inject constructor(
     val uiState: StateFlow<ApuntesHistoryUiState> = _uiState.asStateFlow()
 
     init {
-        loadHistory()
+        observeLocalHistory()
+        refreshHistory()
     }
 
-    fun loadHistory() {
+    fun refreshHistory() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(error = null) }
             val result = repository.getApuntes()
-            result.onSuccess { list ->
-                _uiState.update { it.copy(isLoading = false, records = list) }
-            }.onFailure { err ->
-                _uiState.update { it.copy(isLoading = false, error = err.message ?: "Error al cargar historial") }
+            result.onFailure { err ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = if (it.records.isEmpty()) err.message ?: "Error al cargar historial" else null
+                    )
+                }
+            }
+        }
+    }
+
+    private fun observeLocalHistory() {
+        viewModelScope.launch {
+            repository.observeApuntes().collectLatest { records ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        records = records
+                    )
+                }
             }
         }
     }

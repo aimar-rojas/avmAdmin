@@ -38,16 +38,7 @@ class ApuntesViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ApuntesUiState())
     val uiState: StateFlow<ApuntesUiState> = _uiState.asStateFlow()
 
-    private val selectionTypes = listOf(
-        SelectionTypeInfo(1, "Sin pita"),
-        SelectionTypeInfo(2, "Verde"),
-        SelectionTypeInfo(3, "Blanco"),
-        SelectionTypeInfo(4, "Rosado"),
-        SelectionTypeInfo(5, "Naranja"),
-        SelectionTypeInfo(6, "Azul"),
-        SelectionTypeInfo(7, "Morado"),
-        SelectionTypeInfo(8, "Amarillo")
-    )
+    private val selectionTypes = ApunteSelectionDefaults.orderedTypes
 
     private val editingApunteId = savedStateHandle.get<Int>("apunteId")?.takeIf { it > 0 }
 
@@ -73,9 +64,38 @@ class ApuntesViewModel @Inject constructor(
     }
 
     fun onCountChanged(selectionTypeId: Int, count: String) {
+        val sanitizedCount = count.filter { it.isDigit() }.take(4)
         _uiState.update { state ->
             val newItems = state.items.map {
-                if (it.typeInfo.id == selectionTypeId) it.copy(countInput = count) else it
+                if (it.typeInfo.id == selectionTypeId) it.copy(countInput = sanitizedCount) else it
+            }
+            state.copy(items = newItems)
+        }
+    }
+
+    fun incrementCount(selectionTypeId: Int) {
+        _uiState.update { state ->
+            val newItems = state.items.map {
+                if (it.typeInfo.id == selectionTypeId) {
+                    val nextCount = ((it.countInput.toIntOrNull() ?: 0) + 1).coerceAtMost(9999)
+                    it.copy(isEnabled = true, countInput = nextCount.toString())
+                } else {
+                    it
+                }
+            }
+            state.copy(items = newItems)
+        }
+    }
+
+    fun decrementCount(selectionTypeId: Int) {
+        _uiState.update { state ->
+            val newItems = state.items.map {
+                if (it.typeInfo.id == selectionTypeId) {
+                    val nextCount = ((it.countInput.toIntOrNull() ?: 0) - 1).coerceAtLeast(0)
+                    it.copy(countInput = if (nextCount == 0) "" else nextCount.toString())
+                } else {
+                    it
+                }
             }
             state.copy(items = newItems)
         }

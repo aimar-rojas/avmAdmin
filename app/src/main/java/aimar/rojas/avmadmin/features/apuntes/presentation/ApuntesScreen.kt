@@ -2,11 +2,7 @@ package aimar.rojas.avmadmin.features.apuntes.presentation
 
 import aimar.rojas.avmadmin.ui.components.AvmButtonSize
 import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,15 +11,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -36,8 +33,18 @@ fun ApuntesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isEditing = uiState.editingApunteId != null
+    val totalJabas = uiState.items
+        .filter { it.isEnabled }
+        .sumOf { it.countInput.toIntOrNull() ?: 0 }
 
-    if (uiState.isSuccess) {
+    LaunchedEffect(uiState.isSuccess, isEditing) {
+        if (uiState.isSuccess && isEditing) {
+            viewModel.clearSuccess()
+            navController.navigateUp()
+        }
+    }
+
+    if (uiState.isSuccess && !isEditing) {
         AlertDialog(
             onDismissRequest = { viewModel.clearSuccess() },
             title = { Text("Éxito", style = MaterialTheme.typography.headlineSmall) },
@@ -103,75 +110,21 @@ fun ApuntesScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(uiState.items) { item: ApunteItemState ->
-                    val cardBgColor by animateColorAsState(targetValue = if (item.isEnabled) getSelectionColor(item.typeInfo.id) else MaterialTheme.colorScheme.surfaceVariant, animationSpec = tween(300))
-                    val textColor = if (item.isEnabled) getTextColorForSelection(item.typeInfo.id) else MaterialTheme.colorScheme.onSurfaceVariant
-                    
-                    val switchBgColor by animateColorAsState(targetValue = if (item.isEnabled) Color.White.copy(alpha = 0.3f) else Color.Gray.copy(alpha = 0.4f), animationSpec = tween(300))
-                    val circleBgColor by animateColorAsState(targetValue = if (item.isEnabled) Color.White else Color.LightGray, animationSpec = tween(300))
-                    val switchOffset by animateDpAsState(targetValue = if (item.isEnabled) 16.dp else 0.dp, animationSpec = tween(300))
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                        colors = CardDefaults.cardColors(containerColor = cardBgColor)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Custom Modern Switch (Taller) with Animation
-                            Box(
-                                modifier = Modifier
-                                    .width(56.dp)
-                                    .height(40.dp)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(switchBgColor)
-                                    .clickable { viewModel.toggleItemEnabled(item.typeInfo.id, !item.isEnabled) }
-                                    .padding(4.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .offset(x = switchOffset)
-                                        .clip(CircleShape)
-                                        .background(circleBgColor)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(20.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = item.typeInfo.name,
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = textColor,
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                OutlinedTextField(
-                                    value = item.countInput,
-                                    onValueChange = { viewModel.onCountChanged(item.typeInfo.id, it) },
-                                    label = { Text("Jabas", style = MaterialTheme.typography.titleMedium) },
-                                    enabled = item.isEnabled,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textStyle = MaterialTheme.typography.headlineSmall.copy(color = Color.Black),
-                                    singleLine = true,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = Color.White,
-                                        unfocusedContainerColor = Color.White.copy(alpha = 0.9f),
-                                        disabledContainerColor = Color.Transparent,
-                                        focusedBorderColor = Color.Transparent,
-                                        unfocusedBorderColor = Color.Transparent,
-                                        focusedLabelColor = Color.DarkGray,
-                                        unfocusedLabelColor = Color.Gray
-                                    )
-                                )
-                            }
+                    ApunteSelectionInputCard(
+                        item = item,
+                        onEnabledChanged = { enabled ->
+                            viewModel.toggleItemEnabled(item.typeInfo.id, enabled)
+                        },
+                        onCountChanged = { count ->
+                            viewModel.onCountChanged(item.typeInfo.id, count)
+                        },
+                        onIncrement = {
+                            viewModel.incrementCount(item.typeInfo.id)
+                        },
+                        onDecrement = {
+                            viewModel.decrementCount(item.typeInfo.id)
                         }
-                    }
+                    )
                 }
                 
                 item {
@@ -185,6 +138,10 @@ fun ApuntesScreen(
                         textStyle = MaterialTheme.typography.bodyLarge,
                         minLines = 3
                     )
+                }
+
+                item {
+                    TotalSummary(totalJabas = totalJabas)
                 }
             }
             
@@ -205,23 +162,135 @@ fun ApuntesScreen(
     }
 }
 
-private fun getSelectionColor(id: Int): androidx.compose.ui.graphics.Color {
-    return when (id) {
-        1 -> androidx.compose.ui.graphics.Color.Black      // Sin pita
-        2 -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // Verde
-        3 -> androidx.compose.ui.graphics.Color(0xFFE0E0E0) // Blanco (Gris claro para visibilidad)
-        4 -> androidx.compose.ui.graphics.Color(0xFFE91E63) // Rosado
-        5 -> androidx.compose.ui.graphics.Color(0xFFFF9800) // Naranja
-        6 -> androidx.compose.ui.graphics.Color(0xFF2196F3) // Azul
-        7 -> androidx.compose.ui.graphics.Color(0xFF9C27B0) // Morado
-        8 -> androidx.compose.ui.graphics.Color(0xFFFFEB3B) // Amarillo
-        else -> androidx.compose.ui.graphics.Color.Black
+@Composable
+private fun ApunteSelectionInputCard(
+    item: ApunteItemState,
+    onEnabledChanged: (Boolean) -> Unit,
+    onCountChanged: (String) -> Unit,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit
+) {
+    val count = item.countInput.toIntOrNull() ?: 0
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (item.isEnabled) {
+                MaterialTheme.colorScheme.surface
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .background(
+                            color = ApunteSelectionDefaults.colorFor(item.typeInfo.id),
+                            shape = CircleShape
+                        )
+                )
+
+                Text(
+                    text = item.typeInfo.name,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Switch(
+                    checked = item.isEnabled,
+                    onCheckedChange = onEnabledChanged
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                FilledTonalIconButton(
+                    onClick = onDecrement,
+                    enabled = item.isEnabled && count > 0,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.Filled.Remove, contentDescription = "Restar")
+                }
+
+                OutlinedTextField(
+                    value = item.countInput,
+                    onValueChange = onCountChanged,
+                    enabled = item.isEnabled,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        textAlign = TextAlign.Center,
+                        color = if (item.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    singleLine = true,
+                    placeholder = {
+                        Text(
+                            text = "0",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    },
+                    suffix = {
+                        Text(
+                            text = "jabas",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                )
+
+                FilledTonalIconButton(
+                    onClick = onIncrement,
+                    enabled = item.isEnabled,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Sumar")
+                }
+            }
+        }
     }
 }
 
-private fun getTextColorForSelection(id: Int): androidx.compose.ui.graphics.Color {
-    return when (id) {
-        1, 6, 7 -> androidx.compose.ui.graphics.Color.White // Black, Azul, Morado -> White text
-        else -> androidx.compose.ui.graphics.Color.Black // Verde, Blanco, Rosado, Naranja, Amarillo -> Black text
+@Composable
+private fun TotalSummary(totalJabas: Int) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "TOTAL",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "$totalJabas jabas",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }

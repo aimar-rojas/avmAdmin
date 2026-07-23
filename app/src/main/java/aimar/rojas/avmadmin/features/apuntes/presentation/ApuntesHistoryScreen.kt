@@ -7,10 +7,12 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -23,7 +25,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import aimar.rojas.avmadmin.core.sync.SyncState
 import aimar.rojas.avmadmin.features.apuntes.domain.model.Apunte
-import aimar.rojas.avmadmin.features.selections.presentation.SelectionTypeInfo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,107 +86,143 @@ fun ApunteHistoryCard(
     record: Apunte,
     onClick: () -> Unit
 ) {
-    val selectionTypes = listOf(
-        SelectionTypeInfo(1, "Sin pita"),
-        SelectionTypeInfo(2, "Verde"),
-        SelectionTypeInfo(3, "Blanco"),
-        SelectionTypeInfo(4, "Rosado"),
-        SelectionTypeInfo(5, "Naranja"),
-        SelectionTypeInfo(6, "Azul"),
-        SelectionTypeInfo(7, "Morado"),
-        SelectionTypeInfo(8, "Amarillo")
-    )
+    val enabledDetails = record.details.filter { it.isEnabled && it.jabaCount > 0 }
+    val detailsByType = enabledDetails.associateBy { it.selectionTypeId }
+    val totalJabas = enabledDetails.sumOf { it.jabaCount }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Fecha: ${formatToTextDate(record.recordDate)}",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-
-            if (record.syncState != SyncState.CLEAN) {
-                Spacer(modifier = Modifier.height(8.dp))
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            text = record.syncState.toReadableApunteSyncState(),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    },
-                    colors = AssistChipDefaults.assistChipColors(
-                        labelColor = if (record.syncState.startsWith("FAILED")) {
-                            MaterialTheme.colorScheme.onErrorContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        },
-                        containerColor = if (record.syncState.startsWith("FAILED")) {
-                            MaterialTheme.colorScheme.errorContainer
-                        } else {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        }
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = formatToTextDate(record.recordDate),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
-                )
-            }
-            
-            if (!record.observations.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Obs: ${record.observations}",
-                    style = MaterialTheme.typography.bodyLarge
+
+                    if (!record.observations.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = record.observations,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(12.dp))
+            ApunteStatusChip(syncState = record.syncState)
 
-            record.details.filter { it.isEnabled }.forEach { detail ->
-                val typeName = selectionTypes.find { it.id == detail.selectionTypeId }?.name ?: "Color ${detail.selectionTypeId}"
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            ApunteSelectionDefaults.orderedTypes.forEach { type ->
+                val detail = detailsByType[type.id] ?: return@forEach
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Box(
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(18.dp)
                                 .background(
-                                    color = getSelectionColor(detail.selectionTypeId),
+                                    color = ApunteSelectionDefaults.colorFor(type.id),
                                     shape = CircleShape
                                 )
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = typeName, style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            text = type.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
-                    Text(text = "${detail.jabaCount} Jabas", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = detail.jabaCount.toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "TOTAL",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "$totalJabas jabas",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
     }
 }
 
-private fun getSelectionColor(id: Int): androidx.compose.ui.graphics.Color {
-    return when (id) {
-        1 -> androidx.compose.ui.graphics.Color.Black      // Sin pita
-        2 -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // Verde
-        3 -> androidx.compose.ui.graphics.Color(0xFFE0E0E0) // Blanco (Gris claro para visibilidad)
-        4 -> androidx.compose.ui.graphics.Color(0xFFE91E63) // Rosado
-        5 -> androidx.compose.ui.graphics.Color(0xFFFF9800) // Naranja
-        6 -> androidx.compose.ui.graphics.Color(0xFF2196F3) // Azul
-        7 -> androidx.compose.ui.graphics.Color(0xFF9C27B0) // Morado
-        8 -> androidx.compose.ui.graphics.Color(0xFFFFEB3B) // Amarillo
-        else -> androidx.compose.ui.graphics.Color.Black
+@Composable
+private fun ApunteStatusChip(syncState: String) {
+    val isClean = syncState == SyncState.CLEAN
+    val hasError = syncState.startsWith("FAILED")
+    val containerColor = when {
+        isClean -> MaterialTheme.colorScheme.secondaryContainer
+        hasError -> MaterialTheme.colorScheme.errorContainer
+        else -> MaterialTheme.colorScheme.tertiaryContainer
+    }
+    val contentColor = when {
+        isClean -> MaterialTheme.colorScheme.onSecondaryContainer
+        hasError -> MaterialTheme.colorScheme.onErrorContainer
+        else -> MaterialTheme.colorScheme.onTertiaryContainer
+    }
+
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = containerColor
+    ) {
+        Text(
+            text = syncState.toReadableApunteSyncState(),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = contentColor,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -201,8 +238,11 @@ private fun formatToTextDate(dateStr: String): String {
 
 private fun String.toReadableApunteSyncState(): String {
     return when (this) {
+        SyncState.CLEAN -> "Sincronizado"
         SyncState.PENDING_CREATE -> "Pendiente de sincronizar"
+        SyncState.PENDING_UPDATE -> "Cambios pendientes"
         SyncState.FAILED_CREATE -> "Falló al sincronizar"
+        SyncState.FAILED_UPDATE -> "Falló al actualizar"
         SyncState.SYNCING -> "Sincronizando"
         SyncState.CONFLICT -> "Conflicto de sincronización"
         else -> "Pendiente de sincronizar"
