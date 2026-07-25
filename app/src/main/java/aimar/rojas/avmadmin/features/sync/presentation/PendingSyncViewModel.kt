@@ -8,7 +8,10 @@ import aimar.rojas.avmadmin.features.parties.data.local.entities.PartyEntity
 import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
 import aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionEntity
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentDao
+import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentExpenseDao
 import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentEntity
+import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentExpenseEntity
+import aimar.rojas.avmadmin.features.shipments.presentation.components.expenseCategoryLabel
 import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
 import aimar.rojas.avmadmin.features.trades.data.local.entities.TradeEntity
 import aimar.rojas.avmadmin.utils.DateUtils
@@ -41,10 +44,19 @@ data class PendingSyncItem(
         get() = syncState.startsWith("FAILED") || !error.isNullOrBlank()
 }
 
+private data class CorePendingItems(
+    val parties: List<PartyEntity>,
+    val shipments: List<ShipmentEntity>,
+    val trades: List<TradeEntity>,
+    val selections: List<SelectionEntity>,
+    val apuntes: List<ApunteWithDetails>
+)
+
 @HiltViewModel
 class PendingSyncViewModel @Inject constructor(
     private val partyDao: PartyDao,
     private val shipmentDao: ShipmentDao,
+    private val shipmentExpenseDao: ShipmentExpenseDao,
     private val tradeDao: TradeDao,
     private val selectionDao: SelectionDao,
     private val apuntesDao: ApuntesDao,
@@ -67,19 +79,33 @@ class PendingSyncViewModel @Inject constructor(
 
     private fun observePendingItems() {
         viewModelScope.launch {
-            combine(
+            val corePendingFlow = combine(
                 partyDao.observePendingSyncParties(),
                 shipmentDao.observePendingSyncShipments(),
                 tradeDao.observePendingSyncTrades(),
                 selectionDao.observePendingSelectionEntities(),
                 apuntesDao.observePendingApuntes()
             ) { parties, shipments, trades, selections, apuntes ->
+                CorePendingItems(
+                    parties = parties,
+                    shipments = shipments,
+                    trades = trades,
+                    selections = selections,
+                    apuntes = apuntes
+                )
+            }
+
+            combine(
+                corePendingFlow,
+                shipmentExpenseDao.observePendingSyncExpenses()
+            ) { core, expenses ->
                 buildList {
-                    addAll(parties.map { it.toPendingItem() })
-                    addAll(shipments.map { it.toPendingItem() })
-                    addAll(trades.map { it.toPendingItem() })
-                    addAll(selections.map { it.toPendingItem() })
-                    addAll(apuntes.map { it.toPendingItem() })
+                    addAll(core.parties.map { it.toPendingItem() })
+                    addAll(core.shipments.map { it.toPendingItem() })
+                    addAll(expenses.map { it.toPendingItem() })
+                    addAll(core.trades.map { it.toPendingItem() })
+                    addAll(core.selections.map { it.toPendingItem() })
+                    addAll(core.apuntes.map { it.toPendingItem() })
                 }.sortedWith(
                     compareByDescending<PendingSyncItem> { it.hasError }
                         .thenBy { it.entityLabel }
@@ -122,6 +148,18 @@ class PendingSyncViewModel @Inject constructor(
             entityLabel = "Envío",
             title = "Envío ${DateUtils.formatToDisplayDate(startDate)}",
             subtitle = if (remoteId == null) "Nuevo envío por subir" else "Envío modificado",
+            syncState = syncState,
+            error = syncError,
+            lastAttemptAt = DateUtils.formatSyncTimestampToDisplay(lastSyncAttemptAt)
+        )
+    }
+
+    private fun ShipmentExpenseEntity.toPendingItem(): PendingSyncItem {
+        return PendingSyncItem(
+            id = "shipment-expense-$localId",
+            entityLabel = "Costo",
+            title = expenseCategoryLabel(category),
+            subtitle = "Envío local #$shipmentLocalId - S/ ${"%.2f".format(amount)}",
             syncState = syncState,
             error = syncError,
             lastAttemptAt = DateUtils.formatSyncTimestampToDisplay(lastSyncAttemptAt)

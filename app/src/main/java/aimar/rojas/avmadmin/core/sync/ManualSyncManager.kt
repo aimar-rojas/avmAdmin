@@ -21,10 +21,16 @@ import aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionEnt
 import aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionWithUnitWeights
 import aimar.rojas.avmadmin.features.selections.data.local.entities.UnitWeightEntity
 import aimar.rojas.avmadmin.features.shipments.data.CreateShipmentRequest
+import aimar.rojas.avmadmin.features.shipments.data.CreateShipmentExpenseRequest
+import aimar.rojas.avmadmin.features.shipments.data.ShipmentExpenseDto
+import aimar.rojas.avmadmin.features.shipments.data.ShipmentExpensesApiService
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentDto
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentsApiService
+import aimar.rojas.avmadmin.features.shipments.data.UpdateShipmentExpenseRequest
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentDao
+import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentExpenseDao
 import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentEntity
+import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentExpenseEntity
 import aimar.rojas.avmadmin.features.trades.data.CreateTradeRequest
 import aimar.rojas.avmadmin.features.trades.data.TradeDto
 import aimar.rojas.avmadmin.features.trades.data.TradesApiService
@@ -64,11 +70,13 @@ class ManualSyncManager @Inject constructor(
     private val sessionDataStore: SessionDataStore,
     private val partyDao: PartyDao,
     private val shipmentDao: ShipmentDao,
+    private val shipmentExpenseDao: ShipmentExpenseDao,
     private val tradeDao: TradeDao,
     private val selectionDao: SelectionDao,
     private val apuntesDao: ApuntesDao,
     private val partiesApiService: PartiesApiService,
     private val shipmentsApiService: ShipmentsApiService,
+    private val shipmentExpensesApiService: ShipmentExpensesApiService,
     private val tradesApiService: TradesApiService,
     private val selectionsApiService: SelectionsApiService,
     private val apuntesApiService: ApuntesApiService
@@ -97,16 +105,18 @@ class ManualSyncManager @Inject constructor(
             combine(
                 partyDao.observePendingCount(),
                 shipmentDao.observePendingCount(),
+                shipmentExpenseDao.observePendingCount(),
                 tradeDao.observePendingCount(),
                 selectionDao.observePendingCount(),
                 apuntesDao.observePendingCount()
-            ) { partyCount, shipmentCount, tradeCount, selectionCount, apunteCount ->
+            ) { values ->
                 SyncEntitySummary(
-                    partyPending = partyCount,
-                    shipmentPending = shipmentCount,
-                    tradePending = tradeCount,
-                    selectionPending = selectionCount,
-                    apuntePending = apunteCount
+                    partyPending = values[0],
+                    shipmentPending = values[1],
+                    shipmentExpensePending = values[2],
+                    tradePending = values[3],
+                    selectionPending = values[4],
+                    apuntePending = values[5]
                 )
             }.collect { summary ->
                 _status.update { current -> current.copy(summary = summary) }
@@ -138,12 +148,14 @@ class ManualSyncManager @Inject constructor(
         return try {
             pullParties()?.let { pullErrors.add(it) }
             pullShipments()?.let { pullErrors.add(it) }
+            pullShipmentExpenses()?.let { pullErrors.add(it) }
             pullTrades()?.let { pullErrors.add(it) }
             pullSelections()?.let { pullErrors.add(it) }
             pullApuntes()?.let { pullErrors.add(it) }
 
             resultSummary = resultSummary.merge(syncParties())
             resultSummary = resultSummary.merge(syncShipments())
+            resultSummary = resultSummary.merge(syncShipmentExpenses())
             resultSummary = resultSummary.merge(syncTrades())
             resultSummary = resultSummary.merge(syncSelections())
             resultSummary = resultSummary.merge(syncApuntes())
@@ -306,6 +318,70 @@ class ManualSyncManager @Inject constructor(
             }
         }
         return SyncResultSummary(pushedShipments = successCount.get(), failedItems = failedCount.get())
+    }
+
+    private suspend fun syncShipmentExpenses(): SyncResultSummary {
+        _status.update { it.copy(phase = "Subiendo costos de envío") }
+        val pending = shipmentExpenseDao.getPendingSyncExpenses()
+        Log.d(TAG, "Syncing shipment expenses. pending=${pending.size}")
+        val successCount = AtomicInteger(0)
+        val failedCount = AtomicInteger(0)
+        syncConcurrent(pending, 4) { entity ->
+            val now = nowIso()
+            val syncingEntity = entity.copy(syncState = SyncState.SYNCING, lastSyncAttemptAt = now, syncError = null)
+            shipmentExpenseDao.insertExpense(syncingEntity)
+
+            val shipmentRemoteId = shipmentDao.getShipmentById(entity.shipmentLocalId)?.remoteId
+            if (shipmentRemoteId == null) {
+                Log.w(TAG, "Shipment expense skipped because shipment has no remoteId. localId=${entity.localId}, shipmentLocalId=${entity.shipmentLocalId}")
+                shipmentExpenseDao.insertExpense(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = "Envío sin remoteId"))
+                failedCount.incrementAndGet()
+                return@syncConcurrent
+            }
+
+            val response = if (entity.remoteId == null) {
+                shipmentExpensesApiService.createExpense(
+                    CreateShipmentExpenseRequest(
+                        shipmentId = shipmentRemoteId,
+                        category = entity.category,
+                        subcategory = entity.subcategory,
+                        amount = entity.amount,
+                        quantity = entity.quantity,
+                        unitPrice = entity.unitPrice,
+                        description = entity.description,
+                        expenseDate = entity.expenseDate,
+                        paidByPartyId = entity.paidByPartyLocalId?.let { partyDao.getPartyById(it)?.remoteId }
+                    )
+                )
+            } else {
+                shipmentExpensesApiService.updateExpense(
+                    entity.remoteId,
+                    UpdateShipmentExpenseRequest(
+                        category = entity.category,
+                        subcategory = entity.subcategory,
+                        amount = entity.amount,
+                        quantity = entity.quantity,
+                        unitPrice = entity.unitPrice,
+                        description = entity.description,
+                        expenseDate = entity.expenseDate,
+                        paidByPartyId = entity.paidByPartyLocalId?.let { partyDao.getPartyById(it)?.remoteId }
+                    )
+                )
+            }
+
+            if (response.isSuccessful && response.body() != null) {
+                val dto = response.body()!!.expense
+                val updated = syncingEntity.mergeRemote(dto, now)
+                shipmentExpenseDao.insertExpense(updated)
+                successCount.incrementAndGet()
+            } else {
+                val error = response.errorBody()?.string()
+                Log.w(TAG, "Shipment expense sync failed. localId=${entity.localId}, remoteId=${entity.remoteId}, http=${response.code()}, error=$error")
+                shipmentExpenseDao.insertExpense(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = error))
+                failedCount.incrementAndGet()
+            }
+        }
+        return SyncResultSummary(pushedShipmentExpenses = successCount.get(), failedItems = failedCount.get())
     }
 
     private suspend fun syncTrades(): SyncResultSummary {
@@ -509,6 +585,19 @@ class ManualSyncManager @Inject constructor(
         return null
     }
 
+    private suspend fun pullShipmentExpenses(): String? {
+        _status.update { it.copy(phase = "Actualizando costos de envío") }
+        val response = shipmentExpensesApiService.getExpenses(updatedAfter = sessionDataStore.getLastShipmentExpenseSync())
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            return response.toPullErrorMessage("costos de envío")
+        }
+        val now = nowIso()
+        body.expenses.forEach { dto -> upsertRemoteShipmentExpense(dto, now) }
+        sessionDataStore.saveLastShipmentExpenseSync(now)
+        return null
+    }
+
     private suspend fun pullTrades(): String? {
         _status.update { it.copy(phase = "Actualizando negocios") }
         val lastSync = sessionDataStore.getLastTradeSync() ?: "2000-01-01T00:00:00Z"
@@ -606,6 +695,38 @@ class ManualSyncManager @Inject constructor(
                 syncState = SyncState.CLEAN,
                 lastSyncedAt = now,
                 serverUpdatedAt = dto.updatedAt
+            )
+        )
+    }
+
+    private suspend fun upsertRemoteShipmentExpense(dto: ShipmentExpenseDto, now: String) {
+        val shipmentLocalId = shipmentDao.getShipmentByRemoteId(dto.shipmentId)?.localId ?: return
+        val existing = shipmentExpenseDao.getExpenseByRemoteId(dto.id)
+        if (existing != null && SyncState.isPending(existing.syncState)) {
+            if (hasRemoteConflict(existing.serverUpdatedAt, dto.updatedAt)) {
+                shipmentExpenseDao.insertExpense(existing.asConflict("El costo también cambió en el servidor. Revisa antes de sincronizar."))
+            }
+            return
+        }
+
+        val paidByPartyLocalId = dto.paidByPartyId?.let { partyDao.getPartyByRemoteId(it)?.localId }
+        shipmentExpenseDao.insertExpense(
+            ShipmentExpenseEntity(
+                localId = existing?.localId ?: dto.id,
+                remoteId = dto.id,
+                shipmentLocalId = shipmentLocalId,
+                category = dto.category,
+                subcategory = dto.subcategory,
+                amount = dto.amount,
+                quantity = dto.quantity,
+                unitPrice = dto.unitPrice,
+                description = dto.description,
+                expenseDate = dto.expenseDate,
+                paidByPartyLocalId = paidByPartyLocalId,
+                syncState = SyncState.CLEAN,
+                lastSyncedAt = now,
+                serverUpdatedAt = dto.updatedAt,
+                syncError = null
             )
         )
     }
@@ -710,6 +831,27 @@ class ManualSyncManager @Inject constructor(
         )
     }
 
+    private suspend fun ShipmentExpenseEntity.mergeRemote(dto: ShipmentExpenseDto, now: String): ShipmentExpenseEntity {
+        val shipmentLocalId = shipmentDao.getShipmentByRemoteId(dto.shipmentId)?.localId ?: shipmentLocalId
+        val paidByPartyLocalId = dto.paidByPartyId?.let { partyDao.getPartyByRemoteId(it)?.localId }
+        return copy(
+            remoteId = dto.id,
+            shipmentLocalId = shipmentLocalId,
+            category = dto.category,
+            subcategory = dto.subcategory,
+            amount = dto.amount,
+            quantity = dto.quantity,
+            unitPrice = dto.unitPrice,
+            description = dto.description,
+            expenseDate = dto.expenseDate,
+            paidByPartyLocalId = paidByPartyLocalId,
+            syncState = SyncState.CLEAN,
+            lastSyncedAt = now,
+            serverUpdatedAt = dto.updatedAt,
+            syncError = null
+        )
+    }
+
     private suspend fun TradeEntity.mergeRemote(dto: TradeDto, now: String): TradeEntity {
         val partyLocalId = partyDao.getPartyByRemoteId(dto.partyId)?.localId ?: partyLocalId
         val shipmentLocalId = shipmentDao.getShipmentByRemoteId(dto.shipmentId)?.localId ?: shipmentLocalId
@@ -751,6 +893,13 @@ class ManualSyncManager @Inject constructor(
         )
     }
 
+    private fun ShipmentExpenseEntity.asConflict(message: String): ShipmentExpenseEntity {
+        return copy(
+            syncState = SyncState.CONFLICT,
+            syncError = message
+        )
+    }
+
     private fun TradeEntity.asConflict(message: String): TradeEntity {
         return copy(
             syncState = SyncState.CONFLICT,
@@ -786,6 +935,7 @@ class ManualSyncManager @Inject constructor(
         return SyncResultSummary(
             pushedParties = pushedParties + other.pushedParties,
             pushedShipments = pushedShipments + other.pushedShipments,
+            pushedShipmentExpenses = pushedShipmentExpenses + other.pushedShipmentExpenses,
             pushedTrades = pushedTrades + other.pushedTrades,
             pushedSelections = pushedSelections + other.pushedSelections,
             pushedApuntes = pushedApuntes + other.pushedApuntes,
@@ -811,6 +961,7 @@ class ManualSyncManager @Inject constructor(
     private suspend fun getTotalPendingCount(): Int {
         return partyDao.getPendingCount() +
             shipmentDao.getPendingCount() +
+            shipmentExpenseDao.getPendingCount() +
             tradeDao.getPendingCount() +
             selectionDao.getPendingCount() +
             apuntesDao.getPendingCount()

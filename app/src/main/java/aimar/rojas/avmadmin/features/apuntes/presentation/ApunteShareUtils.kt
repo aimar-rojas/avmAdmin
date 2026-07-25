@@ -100,6 +100,11 @@ private fun drawApunteBitmap(record: Apunte): Bitmap {
         color = android.graphics.Color.rgb(78, 84, 96)
         textSize = 34f
     }
+    val quantityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.rgb(30, 33, 40)
+        textSize = 42f
+        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+    }
     val strongPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.rgb(30, 33, 40)
         textSize = 36f
@@ -134,9 +139,10 @@ private fun drawApunteBitmap(record: Apunte): Bitmap {
             color = ApunteSelectionDefaults.colorFor(type.id).toArgb()
         }
         canvas.drawCircle(104f, y - 10f, 18f, swatchPaint)
-        canvas.drawText(type.name, 142f, y, bodyPaint)
         val amount = detail.jabaCount.toString()
-        canvas.drawText(amount, width - 86f - strongPaint.measureText(amount), y, strongPaint)
+        canvas.drawText(amount, 142f, y + 4f, quantityPaint)
+        val nameX = max(232f, 142f + quantityPaint.measureText(amount) + 34f)
+        canvas.drawText(type.name, nameX, y, bodyPaint)
         y += 58f
     }
 

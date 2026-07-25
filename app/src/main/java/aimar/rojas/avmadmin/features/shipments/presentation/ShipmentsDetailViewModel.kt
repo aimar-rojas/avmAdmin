@@ -7,6 +7,9 @@ import aimar.rojas.avmadmin.domain.model.Party
 import aimar.rojas.avmadmin.domain.model.Trade
 import aimar.rojas.avmadmin.core.sync.ManualSyncManager
 import aimar.rojas.avmadmin.features.parties.domain.PartiesRepository
+import aimar.rojas.avmadmin.features.shipments.domain.ShipmentExpensesRepository
+import aimar.rojas.avmadmin.features.shipments.domain.model.ShipmentExpense
+import aimar.rojas.avmadmin.features.shipments.domain.model.ShipmentExpenseCategory
 import aimar.rojas.avmadmin.features.trades.domain.TradesRepository
 import aimar.rojas.avmadmin.utils.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +25,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ShipmentsDetailViewModel @Inject constructor(
     private val tradesRepository: TradesRepository,
+    private val shipmentExpensesRepository: ShipmentExpensesRepository,
     private val partiesRepository: PartiesRepository,
     private val selectionsRepository: aimar.rojas.avmadmin.features.selections.domain.SelectionsRepository,
     private val manualSyncManager: ManualSyncManager,
@@ -36,7 +40,16 @@ class ShipmentsDetailViewModel @Inject constructor(
     init {
         loadTrades()
         loadParties()
+        observeExpenses()
         observePendingSyncTrades()
+    }
+
+    private fun observeExpenses() {
+        viewModelScope.launch {
+            shipmentExpensesRepository.observeExpenses(shipmentId).collect { expenses ->
+                _uiState.update { it.copy(expenses = expenses) }
+            }
+        }
     }
 
     private fun observePendingSyncTrades() {
@@ -104,6 +117,92 @@ class ShipmentsDetailViewModel @Inject constructor(
 
     fun hideCreateDialog() {
         _uiState.value = _uiState.value.copy(showCreateDialog = false)
+    }
+
+    fun showCreateExpenseSheet() {
+        _uiState.value = _uiState.value.copy(
+            showCreateExpenseSheet = true,
+            expenseCategory = ShipmentExpenseCategory.LABOR,
+            expenseSubcategory = null,
+            expenseAmount = "",
+            expenseQuantity = "",
+            expenseUnitPrice = "",
+            expenseDescription = "",
+            expenseError = null
+        )
+    }
+
+    fun hideCreateExpenseSheet() {
+        _uiState.value = _uiState.value.copy(showCreateExpenseSheet = false)
+    }
+
+    fun onExpenseCategoryChange(category: String) {
+        _uiState.value = _uiState.value.copy(
+            expenseCategory = category,
+            expenseSubcategory = null
+        )
+    }
+
+    fun onExpenseSubcategoryChange(subcategory: String?) {
+        _uiState.value = _uiState.value.copy(expenseSubcategory = subcategory)
+    }
+
+    fun onExpenseAmountChange(value: String) {
+        _uiState.value = _uiState.value.copy(expenseAmount = value)
+    }
+
+    fun onExpenseQuantityChange(value: String) {
+        _uiState.value = _uiState.value.copy(expenseQuantity = value)
+    }
+
+    fun onExpenseUnitPriceChange(value: String) {
+        _uiState.value = _uiState.value.copy(expenseUnitPrice = value)
+    }
+
+    fun onExpenseDescriptionChange(value: String) {
+        _uiState.value = _uiState.value.copy(expenseDescription = value)
+    }
+
+    fun createExpense() {
+        val currentState = _uiState.value
+        val amount = currentState.expenseAmount.toDoubleOrNull()
+
+        if (amount == null || amount <= 0.0) {
+            _uiState.value = currentState.copy(expenseError = "Ingresa un monto válido")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = currentState.copy(isSavingExpense = true, expenseError = null)
+
+            shipmentExpensesRepository.createExpense(
+                shipmentId = shipmentId,
+                category = currentState.expenseCategory,
+                subcategory = currentState.expenseSubcategory,
+                amount = amount,
+                quantity = currentState.expenseQuantity.toDoubleOrNull(),
+                unitPrice = currentState.expenseUnitPrice.toDoubleOrNull(),
+                description = currentState.expenseDescription.takeIf { it.isNotBlank() },
+                expenseDate = DateUtils.currentUtcSyncTimestamp()
+            )
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        isSavingExpense = false,
+                        showCreateExpenseSheet = false,
+                        expenseAmount = "",
+                        expenseQuantity = "",
+                        expenseUnitPrice = "",
+                        expenseDescription = "",
+                        expenseError = null
+                    )
+                }
+                .onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isSavingExpense = false,
+                        expenseError = exception.message ?: "No se pudo guardar el costo"
+                    )
+                }
+        }
     }
 
     fun onPartySelected(partyId: Int) {
@@ -243,6 +342,7 @@ class ShipmentsDetailViewModel @Inject constructor(
 data class ShipmentsDetailUiState(
     val purchases: List<Trade> = emptyList(),
     val sales: List<Trade> = emptyList(),
+    val expenses: List<ShipmentExpense> = emptyList(),
     val suppliers: List<Party> = emptyList(),
     val clients: List<Party> = emptyList(),
     val isLoading: Boolean = false,
@@ -259,5 +359,16 @@ data class ShipmentsDetailUiState(
     val createVarietyAvocado: String = "",
     val createStatus: String = "OPEN",
     val showStartDateTimePicker: Boolean = false,
-    val showEndDateTimePicker: Boolean = false
+    val showEndDateTimePicker: Boolean = false,
+
+    // Create Expense State
+    val showCreateExpenseSheet: Boolean = false,
+    val isSavingExpense: Boolean = false,
+    val expenseCategory: String = ShipmentExpenseCategory.LABOR,
+    val expenseSubcategory: String? = null,
+    val expenseAmount: String = "",
+    val expenseQuantity: String = "",
+    val expenseUnitPrice: String = "",
+    val expenseDescription: String = "",
+    val expenseError: String? = null
 )

@@ -3,17 +3,19 @@ package aimar.rojas.avmadmin.core.sync
 data class SyncEntitySummary(
     val partyPending: Int = 0,
     val shipmentPending: Int = 0,
+    val shipmentExpensePending: Int = 0,
     val tradePending: Int = 0,
     val selectionPending: Int = 0,
     val apuntePending: Int = 0
 ) {
     val totalPending: Int
-        get() = partyPending + shipmentPending + tradePending + selectionPending + apuntePending
+        get() = partyPending + shipmentPending + shipmentExpensePending + tradePending + selectionPending + apuntePending
 }
 
 data class SyncResultSummary(
     val pushedParties: Int = 0,
     val pushedShipments: Int = 0,
+    val pushedShipmentExpenses: Int = 0,
     val pushedTrades: Int = 0,
     val pushedSelections: Int = 0,
     val pushedApuntes: Int = 0,

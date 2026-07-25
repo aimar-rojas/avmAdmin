@@ -42,10 +42,12 @@ class ApuntesRepositoryImpl @Inject constructor(
                     val now = DateUtils.currentUtcSyncTimestamp()
                     body.records.forEach { dto ->
                         val existing = apuntesDao.getApunteByRemoteId(dto.id)
-                        apuntesDao.replaceRecordWithDetails(
-                            dto.toEntity(localId = existing?.localId ?: 0, now = now),
-                            dto.details.orEmpty().map { it.toEntity(existing?.localId ?: 0) }
-                        )
+                        if (existing == null || existing.syncState == SyncState.CLEAN) {
+                            apuntesDao.replaceRecordWithDetails(
+                                dto.toEntity(localId = existing?.localId ?: 0, now = now),
+                                dto.details.orEmpty().map { it.toEntity(existing?.localId ?: 0) }
+                            )
+                        }
                     }
                     Result.success(getOwnLocalApuntes())
                 } else {

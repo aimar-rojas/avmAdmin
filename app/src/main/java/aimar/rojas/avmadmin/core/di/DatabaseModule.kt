@@ -5,6 +5,7 @@ import aimar.rojas.avmadmin.features.apuntes.data.local.ApuntesDao
 import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
 import aimar.rojas.avmadmin.features.parties.data.local.PartyDao
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentDao
+import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentExpenseDao
 import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
 import android.content.Context
 import androidx.room.Room
@@ -296,6 +297,38 @@ object DatabaseModule {
         }
     }
 
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `shipment_expenses` (
+                    `localId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `remoteId` INTEGER,
+                    `shipmentLocalId` INTEGER NOT NULL,
+                    `category` TEXT NOT NULL,
+                    `subcategory` TEXT,
+                    `amount` REAL NOT NULL,
+                    `quantity` REAL,
+                    `unitPrice` REAL,
+                    `description` TEXT,
+                    `expenseDate` TEXT NOT NULL,
+                    `paidByPartyLocalId` INTEGER,
+                    `syncState` TEXT NOT NULL,
+                    `lastSyncAttemptAt` TEXT,
+                    `lastSyncedAt` TEXT,
+                    `serverUpdatedAt` TEXT,
+                    `syncError` TEXT,
+                    FOREIGN KEY(`shipmentLocalId`) REFERENCES `shipments`(`localId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_shipment_expenses_remoteId` ON `shipment_expenses` (`remoteId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_shipment_expenses_shipmentLocalId` ON `shipment_expenses` (`shipmentLocalId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_shipment_expenses_category` ON `shipment_expenses` (`category`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_shipment_expenses_expenseDate` ON `shipment_expenses` (`expenseDate`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideAvmDatabase(@ApplicationContext context: Context): AvmDatabase {
@@ -303,7 +336,7 @@ object DatabaseModule {
             context,
             AvmDatabase::class.java,
             "avm_database"
-        ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+        ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
          .fallbackToDestructiveMigration(dropAllTables = true)
          .build()
     }
@@ -324,6 +357,12 @@ object DatabaseModule {
     @Singleton
     fun provideShipmentDao(database: AvmDatabase): ShipmentDao {
         return database.shipmentDao
+    }
+
+    @Provides
+    @Singleton
+    fun provideShipmentExpenseDao(database: AvmDatabase): ShipmentExpenseDao {
+        return database.shipmentExpenseDao
     }
 
     @Provides

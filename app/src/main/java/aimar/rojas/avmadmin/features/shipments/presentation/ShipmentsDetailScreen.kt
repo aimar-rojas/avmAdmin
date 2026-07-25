@@ -1,19 +1,25 @@
 package aimar.rojas.avmadmin.features.shipments.presentation
 
+import aimar.rojas.avmadmin.domain.model.Trade
 import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateTradeDialog
+import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateShipmentExpenseBottomSheet
+import aimar.rojas.avmadmin.features.shipments.presentation.components.ShipmentExpenseItem
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import aimar.rojas.avmadmin.features.shipments.presentation.components.TradeItem
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,8 +28,6 @@ fun ShipmentsDetailScreen(
     viewModel: ShipmentsDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Compras", "Ventas")
 
     Scaffold(
         topBar = {
@@ -32,7 +36,7 @@ fun ShipmentsDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Atrás",
                         )
                     }
@@ -49,20 +53,6 @@ fun ShipmentsDetailScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            TabRow(
-                selectedTabIndex = selectedTabIndex,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
-                        text = { Text(text = title) }
-                    )
-                }
-            }
-
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
                     uiState.isLoading -> {
@@ -91,52 +81,75 @@ fun ShipmentsDetailScreen(
                         }
                     }
                     else -> {
-                        val isPurchaseTab = selectedTabIndex == 0
-                        val currentList = if (isPurchaseTab) uiState.purchases else uiState.sales
-                        val tradeType = if (isPurchaseTab) "PURCHASE" else "SALE"
-                        val buttonText = if (isPurchaseTab) "Agregar nueva compra" else "Agregar nueva venta"
-                        
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            if (currentList.isEmpty()) {
-                                Box(
-                                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "No hay ${tabs[selectedTabIndex].lowercase()} registradas",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            item {
+                                ShipmentControlSummary(uiState = uiState)
+                            }
+
+                            item {
+                                ShipmentSectionHeader(
+                                    title = "Compras",
+                                    subtitle = "${uiState.purchases.size} registradas",
+                                    buttonText = "Agregar compra",
+                                    onClick = { viewModel.showCreateDialog("PURCHASE") }
+                                )
+                            }
+                            if (uiState.purchases.isEmpty()) {
+                                item { EmptySectionText("Aún no hay compras en este envío") }
+                            } else {
+                                items(uiState.purchases) { trade ->
+                                    val partyName = uiState.partyNameForTrade(trade)
+                                    TradeItem(
+                                        trade = trade,
+                                        partyName = partyName,
+                                        isPendingSync = uiState.pendingSyncTradeIds.contains(trade.tradeId),
+                                        onSyncClick = { viewModel.syncTrade(trade.tradeId) },
+                                        onClick = { navController.navigate("trade_selections/${trade.tradeId}") }
                                     )
                                 }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                                    contentPadding = PaddingValues(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    items(currentList) { trade ->
-                                        val parties = if (trade.tradeType == "PURCHASE") uiState.suppliers else uiState.clients
-                                        val party = parties.find { it.partyId == trade.partyId }
-                                        val partyName = party?.let { it.aliasName ?: "${it.firstName} ${it.lastName ?: ""}".trim() } ?: "Desconocido"
+                            }
 
-                                        TradeItem(
-                                            trade = trade,
-                                            partyName = partyName,
-                                            isPendingSync = uiState.pendingSyncTradeIds.contains(trade.tradeId),
-                                            onSyncClick = { viewModel.syncTrade(trade.tradeId) },
-                                            onClick = { navController.navigate("trade_selections/${trade.tradeId}") }
-                                        )
-                                    }
+                            item {
+                                ShipmentSectionHeader(
+                                    title = "Ventas",
+                                    subtitle = "${uiState.sales.size} registradas",
+                                    buttonText = "Agregar venta",
+                                    onClick = { viewModel.showCreateDialog("SALE") }
+                                )
+                            }
+                            if (uiState.sales.isEmpty()) {
+                                item { EmptySectionText("Aún no hay ventas en este envío") }
+                            } else {
+                                items(uiState.sales) { trade ->
+                                    val partyName = uiState.partyNameForTrade(trade)
+                                    TradeItem(
+                                        trade = trade,
+                                        partyName = partyName,
+                                        isPendingSync = uiState.pendingSyncTradeIds.contains(trade.tradeId),
+                                        onSyncClick = { viewModel.syncTrade(trade.tradeId) },
+                                        onClick = { navController.navigate("trade_selections/${trade.tradeId}") }
+                                    )
                                 }
                             }
-                            
-                            Button(
-                                onClick = { viewModel.showCreateDialog(tradeType) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp)
-                            ) {
-                                Text(buttonText)
+
+                            item {
+                                ShipmentSectionHeader(
+                                    title = "Costos del envío",
+                                    subtitle = "${uiState.expenses.size} registrados",
+                                    buttonText = "Agregar costo",
+                                    onClick = { viewModel.showCreateExpenseSheet() }
+                                )
+                            }
+                            if (uiState.expenses.isEmpty()) {
+                                item { EmptySectionText("Registra jornal, combustible, flete, estibadores, viáticos, taxis u otros") }
+                            } else {
+                                items(uiState.expenses) { expense ->
+                                    ShipmentExpenseItem(expense = expense)
+                                }
                             }
                         }
                     }
@@ -163,5 +176,142 @@ fun ShipmentsDetailScreen(
                 onHideEndDateTimePicker = { viewModel.hideEndDateTimePicker() }
             )
         }
+
+        if (uiState.showCreateExpenseSheet) {
+            CreateShipmentExpenseBottomSheet(
+                category = uiState.expenseCategory,
+                subcategory = uiState.expenseSubcategory,
+                amount = uiState.expenseAmount,
+                quantity = uiState.expenseQuantity,
+                unitPrice = uiState.expenseUnitPrice,
+                description = uiState.expenseDescription,
+                isSaving = uiState.isSavingExpense,
+                error = uiState.expenseError,
+                onDismiss = { viewModel.hideCreateExpenseSheet() },
+                onCategoryChange = { viewModel.onExpenseCategoryChange(it) },
+                onSubcategoryChange = { viewModel.onExpenseSubcategoryChange(it) },
+                onAmountChange = { viewModel.onExpenseAmountChange(it) },
+                onQuantityChange = { viewModel.onExpenseQuantityChange(it) },
+                onUnitPriceChange = { viewModel.onExpenseUnitPriceChange(it) },
+                onDescriptionChange = { viewModel.onExpenseDescriptionChange(it) },
+                onSave = { viewModel.createExpense() }
+            )
+        }
     }
+}
+
+@Composable
+private fun ShipmentControlSummary(uiState: ShipmentsDetailUiState) {
+    val costsTotal = uiState.expenses.sumOf { it.amount }
+    val pendingCount = uiState.pendingSyncTradeIds.size + uiState.expenses.count { it.syncState != aimar.rojas.avmadmin.core.sync.SyncState.CLEAN }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Centro de control del envío",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SummaryMetric("Compras", uiState.purchases.size.toString(), Modifier.weight(1f))
+                SummaryMetric("Ventas", uiState.sales.size.toString(), Modifier.weight(1f))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SummaryMetric("Costos", String.format(Locale.getDefault(), "S/ %.2f", costsTotal), Modifier.weight(1f))
+                SummaryMetric("Pendientes", pendingCount.toString(), Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShipmentSectionHeader(
+    title: String,
+    subtitle: String,
+    buttonText: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        FilledTonalButton(onClick = onClick) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(buttonText)
+        }
+    }
+}
+
+@Composable
+private fun EmptySectionText(text: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun ShipmentsDetailUiState.partyNameForTrade(trade: Trade): String {
+    val parties = if (trade.tradeType == "PURCHASE") suppliers else clients
+    val party = parties.find { it.partyId == trade.partyId }
+    return party?.let { it.aliasName ?: "${it.firstName} ${it.lastName ?: ""}".trim() } ?: "Desconocido"
 }

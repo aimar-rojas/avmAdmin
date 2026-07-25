@@ -33,6 +33,7 @@ class SessionDataStore @Inject constructor(
     // Sync Metadata
     private val lastPartySyncKey = stringPreferencesKey("last_party_sync")
     private val lastShipmentSyncKey = stringPreferencesKey("last_shipment_sync")
+    private val lastShipmentExpenseSyncKey = stringPreferencesKey("last_shipment_expense_sync")
     private val lastTradeSyncKey = stringPreferencesKey("last_trade_sync")
     private val lastSelectionSyncKey = stringPreferencesKey("last_selection_sync")
     private val lastManualSyncAttemptKey = stringPreferencesKey("last_manual_sync_attempt")
@@ -117,6 +118,13 @@ class SessionDataStore @Inject constructor(
     }
     suspend fun getLastShipmentSync(): String? {
         return dataStore.data.first()[lastShipmentSyncKey]
+    }
+
+    suspend fun saveLastShipmentExpenseSync(timestamp: String) {
+        dataStore.edit { preferences -> preferences[lastShipmentExpenseSyncKey] = timestamp }
+    }
+    suspend fun getLastShipmentExpenseSync(): String? {
+        return dataStore.data.first()[lastShipmentExpenseSyncKey]
     }
 
     suspend fun saveLastTradeSync(timestamp: String) {
