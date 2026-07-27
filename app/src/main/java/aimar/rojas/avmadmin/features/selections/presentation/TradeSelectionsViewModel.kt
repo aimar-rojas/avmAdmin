@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import aimar.rojas.avmadmin.features.selections.domain.SelectionsRepository
 import aimar.rojas.avmadmin.features.selections.domain.model.SelectionDetail
+import aimar.rojas.avmadmin.features.selections.domain.model.UnitWeightDetail
 import aimar.rojas.avmadmin.features.trades.domain.TradesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +27,8 @@ data class TradeSelectionsUiState(
     val totalAmount: Int = 0,
     val discountWeightPerTray: Double = 0.0,
     val visibleSelectionTypeIds: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7, 8),
-    val showSelectionManagerDialog: Boolean = false
+    val showSelectionManagerDialog: Boolean = false,
+    val editingUnitWeightId: Int? = null
 )
 
 private data class WeightTotals(
@@ -96,7 +98,14 @@ class TradeSelectionsViewModel @Inject constructor(
     }
 
     fun onSelectionTypeSelected(id: Int) {
-        _uiState.update { it.copy(selectedSelectionTypeId = id) }
+        _uiState.update {
+            it.copy(
+                selectedSelectionTypeId = id,
+                weightInput = "",
+                amountInput = "",
+                editingUnitWeightId = null
+            )
+        }
     }
 
     fun onWeightInputChange(value: String) {
@@ -114,10 +123,20 @@ class TradeSelectionsViewModel @Inject constructor(
         if (weight != null && amount != null) {
             val currentState = _uiState.value
             val currentSelection = currentState.selections.find { it.selectionTypeId == currentState.selectedSelectionTypeId }
+
+            if (currentState.editingUnitWeightId != null && currentSelection != null) {
+                updateUnitWeight(
+                    currentSelection = currentSelection,
+                    unitWeightId = currentState.editingUnitWeightId,
+                    weight = weight,
+                    amount = amount
+                )
+                return
+            }
             
             if (currentSelection != null) {
                 // Add the new unit weight to the current selection
-                val newUnitWeight = aimar.rojas.avmadmin.features.selections.domain.model.UnitWeightDetail(
+                val newUnitWeight = UnitWeightDetail(
                     unitWeightId = 0,
                     weight = weight,
                     amount = amount
@@ -162,6 +181,85 @@ class TradeSelectionsViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun startUnitWeightEdit(unitWeight: UnitWeightDetail) {
+        _uiState.update {
+            it.copy(
+                weightInput = formatWeightInput(unitWeight.weight),
+                amountInput = unitWeight.amount.toString(),
+                editingUnitWeightId = unitWeight.unitWeightId
+            )
+        }
+    }
+
+    fun cancelUnitWeightEdit() {
+        _uiState.update {
+            it.copy(
+                weightInput = "",
+                amountInput = "",
+                editingUnitWeightId = null
+            )
+        }
+    }
+
+    fun deleteUnitWeight(unitWeight: UnitWeightDetail) {
+        val currentState = _uiState.value
+        val currentSelection = currentState.selections.find { it.selectionTypeId == currentState.selectedSelectionTypeId } ?: return
+        val updatedWeights = currentSelection.unitWeights.filterNot { it.unitWeightId == unitWeight.unitWeightId }
+        val updatedSelection = currentSelection.copy(
+            unitWeights = updatedWeights,
+            isPendingSync = true
+        )
+
+        if (currentState.editingUnitWeightId == unitWeight.unitWeightId) {
+            cancelUnitWeightEdit()
+        }
+
+        viewModelScope.launch {
+            if (updatedWeights.isEmpty() && currentSelection.remoteId == null) {
+                selectionsRepository.deleteSelectionLocal(currentSelection.selectionByTradeId)
+            } else {
+                selectionsRepository.saveSelectionLocal(updatedSelection)
+            }
+            loadLocalSelections()
+        }
+    }
+
+    private fun updateUnitWeight(
+        currentSelection: SelectionDetail,
+        unitWeightId: Int,
+        weight: Double,
+        amount: Int
+    ) {
+        val updatedSelection = currentSelection.copy(
+            unitWeights = currentSelection.unitWeights.map { unitWeight ->
+                if (unitWeight.unitWeightId == unitWeightId) {
+                    unitWeight.copy(weight = weight, amount = amount)
+                } else {
+                    unitWeight
+                }
+            },
+            isPendingSync = true
+        )
+
+        _uiState.update {
+            it.copy(
+                weightInput = "",
+                amountInput = "",
+                editingUnitWeightId = null
+            )
+        }
+
+        viewModelScope.launch {
+            selectionsRepository.saveSelectionLocal(updatedSelection)
+            loadLocalSelections()
+        }
+    }
+
+    private fun formatWeightInput(value: Double): String {
+        val raw = value.toString()
+        return if (raw.endsWith(".0")) raw.dropLast(2) else raw
     }
 
     private fun loadLocalSelections() {

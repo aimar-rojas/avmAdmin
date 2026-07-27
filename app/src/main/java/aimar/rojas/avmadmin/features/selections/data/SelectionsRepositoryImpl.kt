@@ -74,6 +74,12 @@ class SelectionsRepositoryImpl @Inject constructor(
         )
     }
 
+    override suspend fun deleteSelectionLocal(selectionId: Int) {
+        if (selectionId > 0) {
+            dao.deleteSelectionById(selectionId)
+        }
+    }
+
     override fun getPendingSyncTradeIds(): kotlinx.coroutines.flow.Flow<List<Int>> {
         return dao.getPendingSyncTradeIds()
     }

@@ -12,17 +12,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -32,7 +35,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
@@ -43,16 +48,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -82,6 +91,9 @@ fun TradeSelectionsScreen(
         onWeightChange = { viewModel.onWeightInputChange(it) },
         onAmountChange = { viewModel.onAmountInputChange(it) },
         onInsertClick = { viewModel.insertUnitWeight() },
+        onCancelEditClick = { viewModel.cancelUnitWeightEdit() },
+        onUnitWeightClick = { viewModel.startUnitWeightEdit(it) },
+        onDeleteUnitWeight = { viewModel.deleteUnitWeight(it) },
         onDoneClick = { navController.navigate("trade_summary/$tradeId") },
         onShowSelectionManager = { viewModel.showSelectionManagerDialog() },
         onHideSelectionManager = { viewModel.hideSelectionManagerDialog() },
@@ -102,12 +114,16 @@ fun TradeSelectionsContent(
     onWeightChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
     onInsertClick: () -> Unit,
+    onCancelEditClick: () -> Unit,
+    onUnitWeightClick: (UnitWeightDetail) -> Unit,
+    onDeleteUnitWeight: (UnitWeightDetail) -> Unit,
     onDoneClick: () -> Unit,
     onShowSelectionManager: () -> Unit,
     onHideSelectionManager: () -> Unit,
     onToggleSelectionVisibility: (Int) -> Unit
 ) {
     val accentColor = getSelectionColor(uiState.selectedSelectionTypeId)
+    var unitWeightToDelete by remember { mutableStateOf<UnitWeightDetail?>(null) }
 
     Scaffold(
         topBar = {
@@ -192,6 +208,8 @@ fun TradeSelectionsContent(
                     onWeightChange = onWeightChange,
                     onAmountChange = onAmountChange,
                     onInsertClick = onInsertClick,
+                    onCancelEditClick = onCancelEditClick,
+                    isEditing = uiState.editingUnitWeightId != null,
                     accentColor = accentColor
                 )
 
@@ -231,13 +249,28 @@ fun TradeSelectionsContent(
                             UnitWeightItem(
                                 unitWeight = unitWeight,
                                 discountWeightPerTray = uiState.discountWeightPerTray,
-                                accentColor = accentColor
+                                accentColor = accentColor,
+                                isEditing = unitWeight.unitWeightId == uiState.editingUnitWeightId,
+                                onClick = { onUnitWeightClick(unitWeight) },
+                                onLongPress = { unitWeightToDelete = unitWeight }
                             )
                         }
                     }
                 }
             }
         }
+    }
+
+    unitWeightToDelete?.let { unitWeight ->
+        DeleteUnitWeightBottomSheet(
+            unitWeight = unitWeight,
+            discountWeightPerTray = uiState.discountWeightPerTray,
+            onDismiss = { unitWeightToDelete = null },
+            onConfirm = {
+                onDeleteUnitWeight(unitWeight)
+                unitWeightToDelete = null
+            }
+        )
     }
 }
 
@@ -385,9 +418,12 @@ fun UnitWeightInputForm(
     onWeightChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
     onInsertClick: () -> Unit,
+    onCancelEditClick: () -> Unit,
+    isEditing: Boolean,
     accentColor: Color
 ) {
     val weightFocusRequester = remember { FocusRequester() }
+    val buttonContentColor = selectionButtonContentColor(accentColor)
 
     Row(
         modifier = Modifier
@@ -420,25 +456,41 @@ fun UnitWeightInputForm(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        Button(
-            onClick = {
-                onInsertClick()
-                weightFocusRequester.requestFocus()
-            },
-            modifier = Modifier.height(110.dp),
-            shape = MaterialTheme.shapes.medium,
-            colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                Icons.Default.Add, 
-                contentDescription = null,
-                tint = if (accentColor == Color.Black) Color.White else Color.Black
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                "Insertar",
-                color = if (accentColor == Color.Black) Color.White else Color.Black
-            )
+            Button(
+                onClick = {
+                    onInsertClick()
+                    weightFocusRequester.requestFocus()
+                },
+                modifier = Modifier.height(if (isEditing) 64.dp else 110.dp),
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+            ) {
+                Icon(
+                    imageVector = if (isEditing) Icons.Default.Check else Icons.Default.Add,
+                    contentDescription = null,
+                    tint = buttonContentColor
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = if (isEditing) "Guardar" else "Insertar",
+                    color = buttonContentColor
+                )
+            }
+            if (isEditing) {
+                OutlinedButton(
+                    onClick = {
+                        onCancelEditClick()
+                        weightFocusRequester.requestFocus()
+                    },
+                    modifier = Modifier.height(38.dp),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Text("Cancelar")
+                }
+            }
         }
     }
 }
@@ -447,14 +499,24 @@ fun UnitWeightInputForm(
 fun UnitWeightItem(
     unitWeight: UnitWeightDetail,
     discountWeightPerTray: Double,
-    accentColor: Color
+    accentColor: Color,
+    isEditing: Boolean,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit
 ) {
     val discount = unitWeight.amount * discountWeightPerTray
     val netWeight = (unitWeight.weight - discount).coerceAtLeast(0.0)
     Surface(
         shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth()
+        color = if (isEditing) accentColor.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(unitWeight.unitWeightId, unitWeight.weight, unitWeight.amount) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = { onLongPress() }
+                )
+            }
     ) {
         Row(
             modifier = Modifier
@@ -490,6 +552,83 @@ fun UnitWeightItem(
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DeleteUnitWeightBottomSheet(
+    unitWeight: UnitWeightDetail,
+    discountWeightPerTray: Double,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val discount = unitWeight.amount * discountWeightPerTray
+    val netWeight = (unitWeight.weight - discount).coerceAtLeast(0.0)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Eliminar peso",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = String.format(
+                    Locale.getDefault(),
+                    "%.2f kg bruto - %d jabas - %.2f kg neto",
+                    unitWeight.weight,
+                    unitWeight.amount,
+                    netWeight
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Text("Cancelar")
+                }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Eliminar")
+                }
+            }
+        }
+    }
+}
+
+private fun selectionButtonContentColor(accentColor: Color): Color {
+    return if (accentColor == Color.Black) Color.White else Color.Black
 }
 
 @Composable
@@ -715,6 +854,9 @@ fun TradeSelectionsPreview() {
             onWeightChange = {},
             onAmountChange = {},
             onInsertClick = {},
+            onCancelEditClick = {},
+            onUnitWeightClick = {},
+            onDeleteUnitWeight = {},
             onDoneClick = {},
             onShowSelectionManager = {},
             onHideSelectionManager = {},
