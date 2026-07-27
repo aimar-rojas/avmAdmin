@@ -46,9 +46,12 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -384,6 +387,8 @@ fun UnitWeightInputForm(
     onInsertClick: () -> Unit,
     accentColor: Color
 ) {
+    val weightFocusRequester = remember { FocusRequester() }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -401,7 +406,9 @@ fun UnitWeightInputForm(
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(weightFocusRequester)
             )
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
@@ -414,7 +421,10 @@ fun UnitWeightInputForm(
             )
         }
         Button(
-            onClick = onInsertClick,
+            onClick = {
+                onInsertClick()
+                weightFocusRequester.requestFocus()
+            },
             modifier = Modifier.height(110.dp),
             shape = MaterialTheme.shapes.medium,
             colors = ButtonDefaults.buttonColors(containerColor = accentColor)
