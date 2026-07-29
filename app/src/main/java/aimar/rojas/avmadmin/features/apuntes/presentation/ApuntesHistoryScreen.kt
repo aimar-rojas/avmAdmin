@@ -6,7 +6,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
@@ -265,7 +264,7 @@ private fun ApunteStatusChip(syncState: String) {
 private fun formatToTextDate(dateStr: String): String {
     return try {
         val date = LocalDate.parse(dateStr.take(10))
-        val formatter = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'del' yyyy", Locale.forLanguageTag("es-ES"))
+        val formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy")
         date.format(formatter)
     } catch (e: Exception) {
         dateStr

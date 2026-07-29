@@ -16,7 +16,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.max
 
 fun shareApunteCardToWhatsApp(context: Context, record: Apunte) {
@@ -184,7 +183,7 @@ private fun String.wrapAt(maxChars: Int): List<String> {
 private fun formatShareDate(dateStr: String): String {
     return try {
         val date = LocalDate.parse(dateStr.take(10))
-        val formatter = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'del' yyyy", Locale.forLanguageTag("es-ES"))
+        val formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy")
         date.format(formatter)
     } catch (e: Exception) {
         dateStr

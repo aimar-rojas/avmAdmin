@@ -147,14 +147,12 @@ fun CreateShipmentBottomSheet(
     onHideEndDatePicker: () -> Unit
 ) {
     val startDatePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = uiState.createStartDate.takeIf { it.isNotBlank() }
-            ?.let { DateUtils.parseApiDate(it)?.time }
+        initialSelectedDateMillis = DateUtils.pickerMillisFromApiDate(uiState.createStartDate)
             ?: System.currentTimeMillis()
     )
 
     val endDatePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = uiState.createEndDate.takeIf { it.isNotBlank() }
-            ?.let { DateUtils.parseApiDate(it)?.time }
+        initialSelectedDateMillis = DateUtils.pickerMillisFromApiDate(uiState.createEndDate)
             ?: System.currentTimeMillis()
     )
 
@@ -165,7 +163,7 @@ fun CreateShipmentBottomSheet(
                 TextButton(
                     onClick = {
                         startDatePickerState.selectedDateMillis?.let { millis ->
-                            val date = Date(millis)
+                            val date = DateUtils.dateFromPickerMillis(millis)
                             onStartDateSelected(date)
                         }
                     }
@@ -190,7 +188,7 @@ fun CreateShipmentBottomSheet(
                 TextButton(
                     onClick = {
                         endDatePickerState.selectedDateMillis?.let { millis ->
-                            val date = Date(millis)
+                            val date = DateUtils.dateFromPickerMillis(millis)
                             onEndDateSelected(date)
                         }
                     }
@@ -333,12 +331,13 @@ private fun ShipmentDateField(
         verticalAlignment = Alignment.CenterVertically
     ) {
         OutlinedTextField(
-            value = value,
+            value = displayValue.takeUnless { it == "Seleccionar fecha" } ?: "",
             onValueChange = onValueChange,
             label = { Text(label) },
             supportingText = { Text(displayValue) },
             modifier = Modifier.weight(1f),
             singleLine = true,
+            readOnly = true,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface
@@ -376,14 +375,12 @@ fun CreateTradeDialog(
     onHideEndDateTimePicker: () -> Unit
 ) {
     val startDatePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = uiState.createStartDatetime.takeIf { it.isNotBlank() }
-            ?.let { DateUtils.parseApiDate(it.substringBefore("T"))?.time }
+        initialSelectedDateMillis = DateUtils.pickerMillisFromApiDate(uiState.createStartDatetime.substringBefore("T").takeIf { it.isNotBlank() })
             ?: System.currentTimeMillis()
     )
 
     val endDatePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = uiState.createEndDatetime.takeIf { it.isNotBlank() }
-            ?.let { DateUtils.parseApiDate(it.substringBefore("T"))?.time }
+        initialSelectedDateMillis = DateUtils.pickerMillisFromApiDate(uiState.createEndDatetime.substringBefore("T").takeIf { it.isNotBlank() })
             ?: System.currentTimeMillis()
     )
 
@@ -394,7 +391,7 @@ fun CreateTradeDialog(
                 TextButton(
                     onClick = {
                         startDatePickerState.selectedDateMillis?.let { millis ->
-                            onStartDatetimeSelected(Date(millis))
+                            onStartDatetimeSelected(DateUtils.dateFromPickerMillis(millis))
                         }
                     }
                 ) { Text("Seleccionar") }
@@ -412,7 +409,7 @@ fun CreateTradeDialog(
                 TextButton(
                     onClick = {
                         endDatePickerState.selectedDateMillis?.let { millis ->
-                            onEndDatetimeSelected(Date(millis))
+                            onEndDatetimeSelected(DateUtils.dateFromPickerMillis(millis))
                         }
                     }
                 ) { Text("Seleccionar") }
@@ -574,7 +571,7 @@ fun CreateTradeDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
-                        value = uiState.createStartDatetime.substringBefore("T"),
+                        value = DateUtils.convertApiToDisplayDate(uiState.createStartDatetime.substringBefore("T")).orEmpty(),
                         onValueChange = onStartDatetimeChange,
                         label = { Text("Inicio") },
                         modifier = Modifier.weight(1f),
@@ -597,7 +594,7 @@ fun CreateTradeDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedTextField(
-                            value = uiState.createEndDatetime.substringBefore("T"),
+                            value = DateUtils.convertApiToDisplayDate(uiState.createEndDatetime.substringBefore("T")).orEmpty(),
                             onValueChange = onEndDatetimeChange,
                             label = { Text("Fin") },
                             modifier = Modifier.weight(1f),

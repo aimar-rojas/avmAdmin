@@ -26,6 +26,7 @@ object ShipmentExpenseCategory {
     const val OTHER = "OTHER"
 
     val all = listOf(LABOR, FUEL, FREIGHT, STEVEDORE, VIATIC, TAXI, OTHER)
+    val operational = listOf(FUEL, FREIGHT, STEVEDORE, VIATIC, TAXI, OTHER)
 }
 
 object ShipmentExpenseSubcategory {

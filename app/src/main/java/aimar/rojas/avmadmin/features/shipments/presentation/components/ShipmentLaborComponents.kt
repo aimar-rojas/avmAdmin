@@ -1,8 +1,7 @@
 package aimar.rojas.avmadmin.features.shipments.presentation.components
 
-import aimar.rojas.avmadmin.features.shipments.domain.model.ShipmentExpense
-import aimar.rojas.avmadmin.features.shipments.domain.model.ShipmentExpenseCategory
-import aimar.rojas.avmadmin.features.shipments.domain.model.ShipmentExpenseSubcategory
+import aimar.rojas.avmadmin.features.shipments.domain.model.ShipmentLabor
+import aimar.rojas.avmadmin.features.workers.domain.model.Worker
 import aimar.rojas.avmadmin.ui.components.AvmButtonSize
 import aimar.rojas.avmadmin.ui.components.AvmFormBottomSheet
 import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
@@ -16,7 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,30 +31,27 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun CreateShipmentExpenseBottomSheet(
-    category: String,
-    subcategory: String?,
+fun CreateShipmentLaborBottomSheet(
+    workers: List<Worker>,
+    selectedWorkerId: Int?,
+    workDate: String,
     amount: String,
-    quantity: String,
-    unitPrice: String,
-    description: String,
+    notes: String,
     isSaving: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onCategoryChange: (String) -> Unit,
-    onSubcategoryChange: (String?) -> Unit,
+    onWorkerSelected: (Int) -> Unit,
+    onWorkDateChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
-    onQuantityChange: (String) -> Unit,
-    onUnitPriceChange: (String) -> Unit,
-    onDescriptionChange: (String) -> Unit,
+    onNotesChange: (String) -> Unit,
     onSave: () -> Unit
 ) {
     AvmFormBottomSheet(
-        title = "Agregar costo",
-        subtitle = "Registra gastos operativos propios de este envío.",
-        leadingIcon = Icons.Filled.AttachMoney,
+        title = "Agregar jornal",
+        subtitle = "Pago diario manual para una persona dentro de este envío.",
+        leadingIcon = Icons.Filled.Groups,
         onDismiss = onDismiss,
         footer = {
             Row(
@@ -81,90 +77,63 @@ fun CreateShipmentExpenseBottomSheet(
         }
     ) {
         Text(
-            text = "Categoría",
+            text = "Personal",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.SemiBold
         )
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ShipmentExpenseCategory.operational.forEach { option ->
-                FilterChip(
-                    selected = category == option,
-                    onClick = { onCategoryChange(option) },
-                    label = { Text(expenseCategoryLabel(option)) }
-                )
-            }
-        }
-
-        if (category == ShipmentExpenseCategory.VIATIC) {
+        if (workers.isEmpty()) {
             Text(
-                text = "Tipo de viático",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
+                text = "Primero registra personal desde el inicio de la app.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        } else {
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ShipmentExpenseSubcategory.viaticOptions.forEach { option ->
+                workers.forEach { worker ->
                     FilterChip(
-                        selected = subcategory == option,
-                        onClick = { onSubcategoryChange(option) },
-                        label = { Text(expenseSubcategoryLabel(option)) }
+                        selected = selectedWorkerId == worker.workerId,
+                        onClick = { onWorkerSelected(worker.workerId) },
+                        label = { Text(worker.fullName) }
                     )
                 }
             }
         }
 
         OutlinedTextField(
+            value = workDate,
+            onValueChange = onWorkDateChange,
+            label = { Text("Fecha de trabajo") },
+            supportingText = { Text("Formato: dd-MM-yyyy") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        OutlinedTextField(
             value = amount,
             onValueChange = onAmountChange,
-            label = { Text("Monto") },
+            label = { Text("Pago del día") },
             prefix = { Text("S/ ") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedTextField(
-                value = quantity,
-                onValueChange = onQuantityChange,
-                label = { Text("Cantidad") },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-            )
-            OutlinedTextField(
-                value = unitPrice,
-                onValueChange = onUnitPriceChange,
-                label = { Text("Precio unit.") },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-            )
-        }
-
         OutlinedTextField(
-            value = description,
-            onValueChange = onDescriptionChange,
-            label = { Text("Detalle") },
+            value = notes,
+            onValueChange = onNotesChange,
+            label = { Text("Nota") },
             modifier = Modifier.fillMaxWidth(),
             minLines = 2
         )
 
         Text(
-            text = "Este costo queda asociado sólo a este envío y pendiente de sincronización.",
+            text = "Si no trabajó o no corresponde pago ese día, simplemente no registres jornal.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -181,7 +150,7 @@ fun CreateShipmentExpenseBottomSheet(
 }
 
 @Composable
-fun ShipmentExpenseItem(expense: ShipmentExpense) {
+fun ShipmentLaborItem(labor: ShipmentLabor) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -198,18 +167,16 @@ fun ShipmentExpenseItem(expense: ShipmentExpense) {
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(
-                    text = expenseCategoryLabel(expense.category),
+                    text = labor.workerName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                expense.subcategory?.let {
-                    Text(
-                        text = expenseSubcategoryLabel(it),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                expense.description?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = aimar.rojas.avmadmin.utils.DateUtils.convertApiToDisplayDate(labor.workDate) ?: labor.workDate,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                labor.notes?.takeIf { it.isNotBlank() }?.let {
                     Text(
                         text = it,
                         style = MaterialTheme.typography.bodyMedium,
@@ -218,34 +185,11 @@ fun ShipmentExpenseItem(expense: ShipmentExpense) {
                 }
             }
             Text(
-                text = String.format(Locale.getDefault(), "S/ %.2f", expense.amount),
+                text = String.format(Locale.getDefault(), "S/ %.2f", labor.amount),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
         }
-    }
-}
-
-fun expenseCategoryLabel(category: String): String {
-    return when (category) {
-        ShipmentExpenseCategory.LABOR -> "Personal / jornal"
-        ShipmentExpenseCategory.FUEL -> "Combustible"
-        ShipmentExpenseCategory.FREIGHT -> "Flete"
-        ShipmentExpenseCategory.STEVEDORE -> "Estivadores"
-        ShipmentExpenseCategory.VIATIC -> "Viáticos"
-        ShipmentExpenseCategory.TAXI -> "Taxis"
-        else -> "Otros"
-    }
-}
-
-fun expenseSubcategoryLabel(subcategory: String): String {
-    return when (subcategory) {
-        ShipmentExpenseSubcategory.BREAKFAST -> "Desayuno"
-        ShipmentExpenseSubcategory.LUNCH -> "Almuerzo"
-        ShipmentExpenseSubcategory.DINNER -> "Cena"
-        ShipmentExpenseSubcategory.SNACK -> "Refrigerio"
-        ShipmentExpenseSubcategory.LODGING -> "Hospedaje"
-        else -> "Otro"
     }
 }

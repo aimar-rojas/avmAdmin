@@ -16,6 +16,7 @@ import aimar.rojas.avmadmin.features.selections.presentation.TradeSummaryScreen
 import aimar.rojas.avmadmin.features.apuntes.presentation.ApuntesScreen
 import aimar.rojas.avmadmin.features.apuntes.presentation.ApuntesHistoryScreen
 import aimar.rojas.avmadmin.features.sync.presentation.PendingSyncScreen
+import aimar.rojas.avmadmin.features.workers.presentation.WorkersScreen
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
@@ -50,6 +51,10 @@ fun NavGraph(
 
         composable("purchases") {
             PurchasesScreen(navController = navController)
+        }
+
+        composable("workers") {
+            WorkersScreen(navController = navController)
         }
 
         composable(

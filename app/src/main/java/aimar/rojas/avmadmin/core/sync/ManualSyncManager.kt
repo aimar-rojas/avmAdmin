@@ -22,21 +22,33 @@ import aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionWit
 import aimar.rojas.avmadmin.features.selections.data.local.entities.UnitWeightEntity
 import aimar.rojas.avmadmin.features.shipments.data.CreateShipmentRequest
 import aimar.rojas.avmadmin.features.shipments.data.CreateShipmentExpenseRequest
+import aimar.rojas.avmadmin.features.shipments.data.CreateShipmentLaborRequest
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentExpenseDto
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentExpensesApiService
+import aimar.rojas.avmadmin.features.shipments.data.ShipmentLaborApiService
+import aimar.rojas.avmadmin.features.shipments.data.ShipmentLaborDto
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentDto
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentsApiService
 import aimar.rojas.avmadmin.features.shipments.data.UpdateShipmentExpenseRequest
+import aimar.rojas.avmadmin.features.shipments.data.UpdateShipmentLaborRequest
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentDao
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentExpenseDao
+import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentLaborDao
 import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentEntity
 import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentExpenseEntity
+import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentLaborEntity
 import aimar.rojas.avmadmin.features.trades.data.CreateTradeRequest
 import aimar.rojas.avmadmin.features.trades.data.TradeDto
 import aimar.rojas.avmadmin.features.trades.data.TradesApiService
 import aimar.rojas.avmadmin.features.trades.data.UpdateTradeRequest
 import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
 import aimar.rojas.avmadmin.features.trades.data.local.entities.TradeEntity
+import aimar.rojas.avmadmin.features.workers.data.CreateWorkerRequest
+import aimar.rojas.avmadmin.features.workers.data.UpdateWorkerRequest
+import aimar.rojas.avmadmin.features.workers.data.WorkerDto
+import aimar.rojas.avmadmin.features.workers.data.WorkersApiService
+import aimar.rojas.avmadmin.features.workers.data.local.WorkerDao
+import aimar.rojas.avmadmin.features.workers.data.local.entities.WorkerEntity
 import aimar.rojas.avmadmin.utils.DateUtils
 import android.util.Log
 import androidx.room.withTransaction
@@ -69,14 +81,18 @@ class ManualSyncManager @Inject constructor(
     private val database: AvmDatabase,
     private val sessionDataStore: SessionDataStore,
     private val partyDao: PartyDao,
+    private val workerDao: WorkerDao,
     private val shipmentDao: ShipmentDao,
     private val shipmentExpenseDao: ShipmentExpenseDao,
+    private val shipmentLaborDao: ShipmentLaborDao,
     private val tradeDao: TradeDao,
     private val selectionDao: SelectionDao,
     private val apuntesDao: ApuntesDao,
     private val partiesApiService: PartiesApiService,
+    private val workersApiService: WorkersApiService,
     private val shipmentsApiService: ShipmentsApiService,
     private val shipmentExpensesApiService: ShipmentExpensesApiService,
+    private val shipmentLaborApiService: ShipmentLaborApiService,
     private val tradesApiService: TradesApiService,
     private val selectionsApiService: SelectionsApiService,
     private val apuntesApiService: ApuntesApiService
@@ -104,19 +120,23 @@ class ManualSyncManager @Inject constructor(
         scope.launch {
             combine(
                 partyDao.observePendingCount(),
+                workerDao.observePendingCount(),
                 shipmentDao.observePendingCount(),
                 shipmentExpenseDao.observePendingCount(),
+                shipmentLaborDao.observePendingCount(),
                 tradeDao.observePendingCount(),
                 selectionDao.observePendingCount(),
                 apuntesDao.observePendingCount()
             ) { values ->
                 SyncEntitySummary(
                     partyPending = values[0],
-                    shipmentPending = values[1],
-                    shipmentExpensePending = values[2],
-                    tradePending = values[3],
-                    selectionPending = values[4],
-                    apuntePending = values[5]
+                    workerPending = values[1],
+                    shipmentPending = values[2],
+                    shipmentExpensePending = values[3],
+                    shipmentLaborPending = values[4],
+                    tradePending = values[5],
+                    selectionPending = values[6],
+                    apuntePending = values[7]
                 )
             }.collect { summary ->
                 _status.update { current -> current.copy(summary = summary) }
@@ -147,15 +167,19 @@ class ManualSyncManager @Inject constructor(
         val pullErrors = mutableListOf<String>()
         return try {
             pullParties()?.let { pullErrors.add(it) }
+            pullWorkers()?.let { pullErrors.add(it) }
             pullShipments()?.let { pullErrors.add(it) }
             pullShipmentExpenses()?.let { pullErrors.add(it) }
+            pullShipmentLabor()?.let { pullErrors.add(it) }
             pullTrades()?.let { pullErrors.add(it) }
             pullSelections()?.let { pullErrors.add(it) }
             pullApuntes()?.let { pullErrors.add(it) }
 
             resultSummary = resultSummary.merge(syncParties())
+            resultSummary = resultSummary.merge(syncWorkers())
             resultSummary = resultSummary.merge(syncShipments())
             resultSummary = resultSummary.merge(syncShipmentExpenses())
+            resultSummary = resultSummary.merge(syncShipmentLabor())
             resultSummary = resultSummary.merge(syncTrades())
             resultSummary = resultSummary.merge(syncSelections())
             resultSummary = resultSummary.merge(syncApuntes())
@@ -264,6 +288,54 @@ class ManualSyncManager @Inject constructor(
             }
         }
         return SyncResultSummary(pushedParties = successCount.get(), failedItems = failedCount.get())
+    }
+
+    private suspend fun syncWorkers(): SyncResultSummary {
+        _status.update { it.copy(phase = "Subiendo personal") }
+        val pending = workerDao.getPendingSyncWorkers()
+        Log.d(TAG, "Syncing workers. pending=${pending.size}")
+        val successCount = AtomicInteger(0)
+        val failedCount = AtomicInteger(0)
+        syncConcurrent(pending, 4) { entity ->
+            val now = nowIso()
+            val syncingEntity = entity.copy(syncState = SyncState.SYNCING, lastSyncAttemptAt = now, syncError = null)
+            workerDao.insertWorker(syncingEntity)
+
+            val response = if (entity.remoteId == null) {
+                workersApiService.createWorker(
+                    CreateWorkerRequest(
+                        fullName = entity.fullName,
+                        dni = entity.dni,
+                        phone = entity.phone,
+                        notes = entity.notes
+                    )
+                )
+            } else {
+                workersApiService.updateWorker(
+                    entity.remoteId,
+                    UpdateWorkerRequest(
+                        fullName = entity.fullName,
+                        dni = entity.dni,
+                        phone = entity.phone,
+                        isActive = entity.isActive,
+                        notes = entity.notes
+                    )
+                )
+            }
+
+            if (response.isSuccessful && response.body() != null) {
+                val dto = response.body()!!.worker
+                val updated = syncingEntity.mergeRemote(dto, now)
+                workerDao.insertWorker(updated)
+                successCount.incrementAndGet()
+            } else {
+                val error = response.errorBody()?.string()
+                Log.w(TAG, "Worker sync failed. localId=${entity.localId}, remoteId=${entity.remoteId}, http=${response.code()}, error=$error")
+                workerDao.insertWorker(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = error))
+                failedCount.incrementAndGet()
+            }
+        }
+        return SyncResultSummary(pushedWorkers = successCount.get(), failedItems = failedCount.get())
     }
 
     private suspend fun syncShipments(): SyncResultSummary {
@@ -382,6 +454,65 @@ class ManualSyncManager @Inject constructor(
             }
         }
         return SyncResultSummary(pushedShipmentExpenses = successCount.get(), failedItems = failedCount.get())
+    }
+
+    private suspend fun syncShipmentLabor(): SyncResultSummary {
+        _status.update { it.copy(phase = "Subiendo jornales") }
+        val pending = shipmentLaborDao.getPendingSyncLabor()
+        Log.d(TAG, "Syncing shipment labor. pending=${pending.size}")
+        val successCount = AtomicInteger(0)
+        val failedCount = AtomicInteger(0)
+        syncConcurrent(pending, 4) { entity ->
+            val now = nowIso()
+            val syncingEntity = entity.copy(syncState = SyncState.SYNCING, lastSyncAttemptAt = now, syncError = null)
+            shipmentLaborDao.insertLabor(syncingEntity)
+
+            val shipmentRemoteId = shipmentDao.getShipmentById(entity.shipmentLocalId)?.remoteId
+            val workerRemoteId = workerDao.getWorkerById(entity.workerLocalId)?.remoteId
+            if (shipmentRemoteId == null || workerRemoteId == null) {
+                Log.w(
+                    TAG,
+                    "Shipment labor skipped because dependencies are missing remoteId. localId=${entity.localId}, shipmentLocalId=${entity.shipmentLocalId}, shipmentRemoteId=$shipmentRemoteId, workerLocalId=${entity.workerLocalId}, workerRemoteId=$workerRemoteId"
+                )
+                shipmentLaborDao.insertLabor(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = "Dependencias sin remoteId"))
+                failedCount.incrementAndGet()
+                return@syncConcurrent
+            }
+
+            val response = if (entity.remoteId == null) {
+                shipmentLaborApiService.createLabor(
+                    CreateShipmentLaborRequest(
+                        shipmentId = shipmentRemoteId,
+                        workerId = workerRemoteId,
+                        workDate = entity.workDate,
+                        amount = entity.amount,
+                        notes = entity.notes
+                    )
+                )
+            } else {
+                shipmentLaborApiService.updateLabor(
+                    entity.remoteId,
+                    UpdateShipmentLaborRequest(
+                        workDate = entity.workDate,
+                        amount = entity.amount,
+                        notes = entity.notes
+                    )
+                )
+            }
+
+            if (response.isSuccessful && response.body() != null) {
+                val dto = response.body()!!.labor
+                val updated = syncingEntity.mergeRemote(dto, now)
+                shipmentLaborDao.insertLabor(updated)
+                successCount.incrementAndGet()
+            } else {
+                val error = response.errorBody()?.string()
+                Log.w(TAG, "Shipment labor sync failed. localId=${entity.localId}, remoteId=${entity.remoteId}, http=${response.code()}, error=$error")
+                shipmentLaborDao.insertLabor(syncingEntity.copy(syncState = SyncState.failureStateFor(entity.syncState), syncError = error))
+                failedCount.incrementAndGet()
+            }
+        }
+        return SyncResultSummary(pushedShipmentLabor = successCount.get(), failedItems = failedCount.get())
     }
 
     private suspend fun syncTrades(): SyncResultSummary {
@@ -572,6 +703,19 @@ class ManualSyncManager @Inject constructor(
         return null
     }
 
+    private suspend fun pullWorkers(): String? {
+        _status.update { it.copy(phase = "Actualizando personal") }
+        val response = workersApiService.getWorkers(updatedAfter = sessionDataStore.getLastWorkerSync())
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            return response.toPullErrorMessage("personal")
+        }
+        val now = nowIso()
+        body.workers.forEach { dto -> upsertRemoteWorker(dto, now) }
+        sessionDataStore.saveLastWorkerSync(now)
+        return null
+    }
+
     private suspend fun pullShipments(): String? {
         _status.update { it.copy(phase = "Actualizando envíos") }
         val response = shipmentsApiService.getShipments(updatedAfter = sessionDataStore.getLastShipmentSync())
@@ -595,6 +739,19 @@ class ManualSyncManager @Inject constructor(
         val now = nowIso()
         body.expenses.forEach { dto -> upsertRemoteShipmentExpense(dto, now) }
         sessionDataStore.saveLastShipmentExpenseSync(now)
+        return null
+    }
+
+    private suspend fun pullShipmentLabor(): String? {
+        _status.update { it.copy(phase = "Actualizando jornales") }
+        val response = shipmentLaborApiService.getLabor(updatedAfter = sessionDataStore.getLastShipmentLaborSync())
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            return response.toPullErrorMessage("jornales")
+        }
+        val now = nowIso()
+        body.labor.forEach { dto -> upsertRemoteShipmentLabor(dto, now) }
+        sessionDataStore.saveLastShipmentLaborSync(now)
         return null
     }
 
@@ -676,6 +833,31 @@ class ManualSyncManager @Inject constructor(
         )
     }
 
+    private suspend fun upsertRemoteWorker(dto: WorkerDto, now: String) {
+        val existing = workerDao.getWorkerByRemoteId(dto.id)
+        if (existing != null && SyncState.isPending(existing.syncState)) {
+            if (hasRemoteConflict(existing.serverUpdatedAt, dto.updatedAt)) {
+                workerDao.insertWorker(existing.asConflict("El personal también cambió en el servidor. Revisa antes de sincronizar."))
+            }
+            return
+        }
+        workerDao.insertWorker(
+            WorkerEntity(
+                localId = existing?.localId ?: dto.id,
+                remoteId = dto.id,
+                fullName = dto.fullName,
+                dni = dto.dni,
+                phone = dto.phone,
+                isActive = dto.isActive,
+                notes = dto.notes,
+                syncState = SyncState.CLEAN,
+                lastSyncedAt = now,
+                serverUpdatedAt = dto.updatedAt,
+                syncError = null
+            )
+        )
+    }
+
     private suspend fun upsertRemoteShipment(dto: ShipmentDto, now: String) {
         val existing = shipmentDao.getShipmentByRemoteId(dto.shipmentId)
         if (existing != null && SyncState.isPending(existing.syncState)) {
@@ -723,6 +905,36 @@ class ManualSyncManager @Inject constructor(
                 description = dto.description,
                 expenseDate = dto.expenseDate,
                 paidByPartyLocalId = paidByPartyLocalId,
+                syncState = SyncState.CLEAN,
+                lastSyncedAt = now,
+                serverUpdatedAt = dto.updatedAt,
+                syncError = null
+            )
+        )
+    }
+
+    private suspend fun upsertRemoteShipmentLabor(dto: ShipmentLaborDto, now: String) {
+        dto.worker?.let { upsertRemoteWorker(it, now) }
+
+        val shipmentLocalId = shipmentDao.getShipmentByRemoteId(dto.shipmentId)?.localId ?: return
+        val workerLocalId = workerDao.getWorkerByRemoteId(dto.workerId)?.localId ?: return
+        val existing = shipmentLaborDao.getLaborByRemoteId(dto.id)
+        if (existing != null && SyncState.isPending(existing.syncState)) {
+            if (hasRemoteConflict(existing.serverUpdatedAt, dto.updatedAt)) {
+                shipmentLaborDao.insertLabor(existing.asConflict("El jornal también cambió en el servidor. Revisa antes de sincronizar."))
+            }
+            return
+        }
+
+        shipmentLaborDao.insertLabor(
+            ShipmentLaborEntity(
+                localId = existing?.localId ?: dto.id,
+                remoteId = dto.id,
+                shipmentLocalId = shipmentLocalId,
+                workerLocalId = workerLocalId,
+                workDate = dto.workDate,
+                amount = dto.amount,
+                notes = dto.notes,
                 syncState = SyncState.CLEAN,
                 lastSyncedAt = now,
                 serverUpdatedAt = dto.updatedAt,
@@ -818,6 +1030,21 @@ class ManualSyncManager @Inject constructor(
         )
     }
 
+    private suspend fun WorkerEntity.mergeRemote(dto: WorkerDto, now: String): WorkerEntity {
+        return copy(
+            remoteId = dto.id,
+            fullName = dto.fullName,
+            dni = dto.dni,
+            phone = dto.phone,
+            isActive = dto.isActive,
+            notes = dto.notes,
+            syncState = SyncState.CLEAN,
+            lastSyncedAt = now,
+            serverUpdatedAt = dto.updatedAt,
+            syncError = null
+        )
+    }
+
     private suspend fun ShipmentEntity.mergeRemote(dto: ShipmentDto, now: String): ShipmentEntity {
         return copy(
             remoteId = dto.shipmentId,
@@ -851,6 +1078,25 @@ class ManualSyncManager @Inject constructor(
             syncError = null
         )
     }
+
+    private suspend fun ShipmentLaborEntity.mergeRemote(dto: ShipmentLaborDto, now: String): ShipmentLaborEntity {
+        dto.worker?.let { upsertRemoteWorker(it, now) }
+        val shipmentLocalId = shipmentDao.getShipmentByRemoteId(dto.shipmentId)?.localId ?: shipmentLocalId
+        val workerLocalId = workerDao.getWorkerByRemoteId(dto.workerId)?.localId ?: workerLocalId
+        return copy(
+            remoteId = dto.id,
+            shipmentLocalId = shipmentLocalId,
+            workerLocalId = workerLocalId,
+            workDate = dto.workDate,
+            amount = dto.amount,
+            notes = dto.notes,
+            syncState = SyncState.CLEAN,
+            lastSyncedAt = now,
+            serverUpdatedAt = dto.updatedAt,
+            syncError = null
+        )
+    }
+
 
     private suspend fun TradeEntity.mergeRemote(dto: TradeDto, now: String): TradeEntity {
         val partyLocalId = partyDao.getPartyByRemoteId(dto.partyId)?.localId ?: partyLocalId
@@ -886,6 +1132,13 @@ class ManualSyncManager @Inject constructor(
         )
     }
 
+    private fun WorkerEntity.asConflict(message: String): WorkerEntity {
+        return copy(
+            syncState = SyncState.CONFLICT,
+            syncError = message
+        )
+    }
+
     private fun ShipmentEntity.asConflict(message: String): ShipmentEntity {
         return copy(
             syncState = SyncState.CONFLICT,
@@ -894,6 +1147,13 @@ class ManualSyncManager @Inject constructor(
     }
 
     private fun ShipmentExpenseEntity.asConflict(message: String): ShipmentExpenseEntity {
+        return copy(
+            syncState = SyncState.CONFLICT,
+            syncError = message
+        )
+    }
+
+    private fun ShipmentLaborEntity.asConflict(message: String): ShipmentLaborEntity {
         return copy(
             syncState = SyncState.CONFLICT,
             syncError = message
@@ -934,8 +1194,10 @@ class ManualSyncManager @Inject constructor(
     private fun SyncResultSummary.merge(other: SyncResultSummary): SyncResultSummary {
         return SyncResultSummary(
             pushedParties = pushedParties + other.pushedParties,
+            pushedWorkers = pushedWorkers + other.pushedWorkers,
             pushedShipments = pushedShipments + other.pushedShipments,
             pushedShipmentExpenses = pushedShipmentExpenses + other.pushedShipmentExpenses,
+            pushedShipmentLabor = pushedShipmentLabor + other.pushedShipmentLabor,
             pushedTrades = pushedTrades + other.pushedTrades,
             pushedSelections = pushedSelections + other.pushedSelections,
             pushedApuntes = pushedApuntes + other.pushedApuntes,
@@ -960,8 +1222,10 @@ class ManualSyncManager @Inject constructor(
 
     private suspend fun getTotalPendingCount(): Int {
         return partyDao.getPendingCount() +
+            workerDao.getPendingCount() +
             shipmentDao.getPendingCount() +
             shipmentExpenseDao.getPendingCount() +
+            shipmentLaborDao.getPendingCount() +
             tradeDao.getPendingCount() +
             selectionDao.getPendingCount() +
             apuntesDao.getPendingCount()

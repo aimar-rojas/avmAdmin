@@ -8,9 +8,13 @@ import aimar.rojas.avmadmin.domain.model.Trade
 import aimar.rojas.avmadmin.core.sync.ManualSyncManager
 import aimar.rojas.avmadmin.features.parties.domain.PartiesRepository
 import aimar.rojas.avmadmin.features.shipments.domain.ShipmentExpensesRepository
+import aimar.rojas.avmadmin.features.shipments.domain.ShipmentLaborRepository
 import aimar.rojas.avmadmin.features.shipments.domain.model.ShipmentExpense
 import aimar.rojas.avmadmin.features.shipments.domain.model.ShipmentExpenseCategory
+import aimar.rojas.avmadmin.features.shipments.domain.model.ShipmentLabor
 import aimar.rojas.avmadmin.features.trades.domain.TradesRepository
+import aimar.rojas.avmadmin.features.workers.domain.WorkersRepository
+import aimar.rojas.avmadmin.features.workers.domain.model.Worker
 import aimar.rojas.avmadmin.utils.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +30,8 @@ import javax.inject.Inject
 class ShipmentsDetailViewModel @Inject constructor(
     private val tradesRepository: TradesRepository,
     private val shipmentExpensesRepository: ShipmentExpensesRepository,
+    private val shipmentLaborRepository: ShipmentLaborRepository,
+    private val workersRepository: WorkersRepository,
     private val partiesRepository: PartiesRepository,
     private val selectionsRepository: aimar.rojas.avmadmin.features.selections.domain.SelectionsRepository,
     private val manualSyncManager: ManualSyncManager,
@@ -41,6 +47,8 @@ class ShipmentsDetailViewModel @Inject constructor(
         loadTrades()
         loadParties()
         observeExpenses()
+        observeLabor()
+        observeWorkers()
         observePendingSyncTrades()
     }
 
@@ -48,6 +56,22 @@ class ShipmentsDetailViewModel @Inject constructor(
         viewModelScope.launch {
             shipmentExpensesRepository.observeExpenses(shipmentId).collect { expenses ->
                 _uiState.update { it.copy(expenses = expenses) }
+            }
+        }
+    }
+
+    private fun observeLabor() {
+        viewModelScope.launch {
+            shipmentLaborRepository.observeLaborByShipment(shipmentId).collect { labor ->
+                _uiState.update { it.copy(labor = labor) }
+            }
+        }
+    }
+
+    private fun observeWorkers() {
+        viewModelScope.launch {
+            workersRepository.observeWorkers(activeOnly = true).collect { workers ->
+                _uiState.update { it.copy(workers = workers) }
             }
         }
     }
@@ -122,7 +146,7 @@ class ShipmentsDetailViewModel @Inject constructor(
     fun showCreateExpenseSheet() {
         _uiState.value = _uiState.value.copy(
             showCreateExpenseSheet = true,
-            expenseCategory = ShipmentExpenseCategory.LABOR,
+            expenseCategory = ShipmentExpenseCategory.FUEL,
             expenseSubcategory = null,
             expenseAmount = "",
             expenseQuantity = "",
@@ -200,6 +224,85 @@ class ShipmentsDetailViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isSavingExpense = false,
                         expenseError = exception.message ?: "No se pudo guardar el costo"
+                    )
+                }
+        }
+    }
+
+    fun showCreateLaborSheet() {
+        val workers = _uiState.value.workers
+        _uiState.value = _uiState.value.copy(
+            showCreateLaborSheet = true,
+            laborWorkerId = workers.firstOrNull()?.workerId,
+            laborDate = DateUtils.formatToDisplayDate(Date()),
+            laborAmount = "",
+            laborNotes = "",
+            laborError = null
+        )
+    }
+
+    fun hideCreateLaborSheet() {
+        _uiState.value = _uiState.value.copy(showCreateLaborSheet = false)
+    }
+
+    fun onLaborWorkerSelected(workerId: Int) {
+        _uiState.value = _uiState.value.copy(laborWorkerId = workerId)
+    }
+
+    fun onLaborDateChange(value: String) {
+        _uiState.value = _uiState.value.copy(laborDate = value)
+    }
+
+    fun onLaborAmountChange(value: String) {
+        _uiState.value = _uiState.value.copy(laborAmount = value)
+    }
+
+    fun onLaborNotesChange(value: String) {
+        _uiState.value = _uiState.value.copy(laborNotes = value)
+    }
+
+    fun createLabor() {
+        val currentState = _uiState.value
+        val workerId = currentState.laborWorkerId
+        val amount = currentState.laborAmount.toDoubleOrNull()
+
+        if (workerId == null) {
+            _uiState.value = currentState.copy(laborError = "Primero selecciona un personal")
+            return
+        }
+        val workDate = DateUtils.convertDisplayToApiDate(currentState.laborDate)
+        if (workDate == null || !DateUtils.isDisplayDate(currentState.laborDate)) {
+            _uiState.value = currentState.copy(laborError = "Ingresa la fecha como dd-MM-yyyy")
+            return
+        }
+        if (amount == null || amount <= 0.0) {
+            _uiState.value = currentState.copy(laborError = "Ingresa un pago válido")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = currentState.copy(isSavingLabor = true, laborError = null)
+
+            shipmentLaborRepository.createLabor(
+                shipmentId = shipmentId,
+                workerId = workerId,
+                workDate = workDate,
+                amount = amount,
+                notes = currentState.laborNotes.takeIf { it.isNotBlank() }
+            )
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        isSavingLabor = false,
+                        showCreateLaborSheet = false,
+                        laborAmount = "",
+                        laborNotes = "",
+                        laborError = null
+                    )
+                }
+                .onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isSavingLabor = false,
+                        laborError = exception.message ?: "No se pudo guardar el jornal"
                     )
                 }
         }
@@ -343,6 +446,8 @@ data class ShipmentsDetailUiState(
     val purchases: List<Trade> = emptyList(),
     val sales: List<Trade> = emptyList(),
     val expenses: List<ShipmentExpense> = emptyList(),
+    val labor: List<ShipmentLabor> = emptyList(),
+    val workers: List<Worker> = emptyList(),
     val suppliers: List<Party> = emptyList(),
     val clients: List<Party> = emptyList(),
     val isLoading: Boolean = false,
@@ -370,5 +475,14 @@ data class ShipmentsDetailUiState(
     val expenseQuantity: String = "",
     val expenseUnitPrice: String = "",
     val expenseDescription: String = "",
-    val expenseError: String? = null
+    val expenseError: String? = null,
+
+    // Create Labor State
+    val showCreateLaborSheet: Boolean = false,
+    val isSavingLabor: Boolean = false,
+    val laborWorkerId: Int? = null,
+    val laborDate: String = "",
+    val laborAmount: String = "",
+    val laborNotes: String = "",
+    val laborError: String? = null
 )

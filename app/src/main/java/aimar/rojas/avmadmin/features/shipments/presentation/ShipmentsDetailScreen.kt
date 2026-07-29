@@ -2,8 +2,10 @@ package aimar.rojas.avmadmin.features.shipments.presentation
 
 import aimar.rojas.avmadmin.domain.model.Trade
 import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateTradeDialog
+import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateShipmentLaborBottomSheet
 import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateShipmentExpenseBottomSheet
 import aimar.rojas.avmadmin.features.shipments.presentation.components.ShipmentExpenseItem
+import aimar.rojas.avmadmin.features.shipments.presentation.components.ShipmentLaborItem
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -138,14 +140,30 @@ fun ShipmentsDetailScreen(
 
                             item {
                                 ShipmentSectionHeader(
-                                    title = "Costos del envío",
+                                    title = "Jornales",
+                                    subtitle = "${uiState.labor.size} pagos registrados",
+                                    buttonText = "Agregar jornal",
+                                    onClick = { viewModel.showCreateLaborSheet() }
+                                )
+                            }
+                            if (uiState.labor.isEmpty()) {
+                                item { EmptySectionText("Registra pagos diarios por persona cuando haya trabajo en este envío") }
+                            } else {
+                                items(uiState.labor) { labor ->
+                                    ShipmentLaborItem(labor = labor)
+                                }
+                            }
+
+                            item {
+                                ShipmentSectionHeader(
+                                    title = "Costos operativos",
                                     subtitle = "${uiState.expenses.size} registrados",
                                     buttonText = "Agregar costo",
                                     onClick = { viewModel.showCreateExpenseSheet() }
                                 )
                             }
                             if (uiState.expenses.isEmpty()) {
-                                item { EmptySectionText("Registra jornal, combustible, flete, estibadores, viáticos, taxis u otros") }
+                                item { EmptySectionText("Registra combustible, flete, estibadores, viáticos, taxis u otros") }
                             } else {
                                 items(uiState.expenses) { expense ->
                                     ShipmentExpenseItem(expense = expense)
@@ -197,13 +215,34 @@ fun ShipmentsDetailScreen(
                 onSave = { viewModel.createExpense() }
             )
         }
+
+        if (uiState.showCreateLaborSheet) {
+            CreateShipmentLaborBottomSheet(
+                workers = uiState.workers,
+                selectedWorkerId = uiState.laborWorkerId,
+                workDate = uiState.laborDate,
+                amount = uiState.laborAmount,
+                notes = uiState.laborNotes,
+                isSaving = uiState.isSavingLabor,
+                error = uiState.laborError,
+                onDismiss = { viewModel.hideCreateLaborSheet() },
+                onWorkerSelected = { viewModel.onLaborWorkerSelected(it) },
+                onWorkDateChange = { viewModel.onLaborDateChange(it) },
+                onAmountChange = { viewModel.onLaborAmountChange(it) },
+                onNotesChange = { viewModel.onLaborNotesChange(it) },
+                onSave = { viewModel.createLabor() }
+            )
+        }
     }
 }
 
 @Composable
 private fun ShipmentControlSummary(uiState: ShipmentsDetailUiState) {
-    val costsTotal = uiState.expenses.sumOf { it.amount }
-    val pendingCount = uiState.pendingSyncTradeIds.size + uiState.expenses.count { it.syncState != aimar.rojas.avmadmin.core.sync.SyncState.CLEAN }
+    val laborTotal = uiState.labor.sumOf { it.amount }
+    val costsTotal = uiState.expenses.sumOf { it.amount } + laborTotal
+    val pendingCount = uiState.pendingSyncTradeIds.size +
+        uiState.expenses.count { it.syncState != aimar.rojas.avmadmin.core.sync.SyncState.CLEAN } +
+        uiState.labor.count { it.syncState != aimar.rojas.avmadmin.core.sync.SyncState.CLEAN }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -232,6 +271,13 @@ private fun ShipmentControlSummary(uiState: ShipmentsDetailUiState) {
             ) {
                 SummaryMetric("Costos", String.format(Locale.getDefault(), "S/ %.2f", costsTotal), Modifier.weight(1f))
                 SummaryMetric("Pendientes", pendingCount.toString(), Modifier.weight(1f))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SummaryMetric("Jornales", String.format(Locale.getDefault(), "S/ %.2f", laborTotal), Modifier.weight(1f))
+                SummaryMetric("Personal", uiState.labor.map { it.workerId }.distinct().size.toString(), Modifier.weight(1f))
             }
         }
     }

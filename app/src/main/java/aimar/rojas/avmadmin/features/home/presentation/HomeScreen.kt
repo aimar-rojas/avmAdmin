@@ -133,6 +133,22 @@ fun HomeScreen(
                     onClick = { navController.navigate("apuntes") }
                 )
             }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                HomeActionCard(
+                    title = "Personal",
+                    subtitle = "Jornales por envío",
+                    icon = Icons.Filled.Groups,
+                    modifier = Modifier.weight(1f),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    onClick = { navController.navigate("workers") }
+                )
+                Spacer(modifier = Modifier.weight(1f))
+            }
         }
 
         val totalPending = uiState.syncStatus.summary.totalPending

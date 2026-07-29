@@ -1,8 +1,11 @@
 package aimar.rojas.avmadmin.core.di
 
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentsRepositoryImpl
+import aimar.rojas.avmadmin.features.shipments.data.ShipmentLaborApiService
+import aimar.rojas.avmadmin.features.shipments.data.ShipmentLaborRepositoryImpl
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentExpensesRepositoryImpl
 import aimar.rojas.avmadmin.features.shipments.data.ShipmentExpensesApiService
+import aimar.rojas.avmadmin.features.shipments.domain.ShipmentLaborRepository
 import aimar.rojas.avmadmin.features.shipments.domain.ShipmentExpensesRepository
 import aimar.rojas.avmadmin.features.shipments.domain.ShipmentsRepository
 import aimar.rojas.avmadmin.features.trades.data.TradesApiService
@@ -37,6 +40,12 @@ object ShipmentsModule {
     fun provideShipmentExpensesApiService(retrofit: Retrofit): ShipmentExpensesApiService {
         return retrofit.create(ShipmentExpensesApiService::class.java)
     }
+
+    @Provides
+    @Singleton
+    fun provideShipmentLaborApiService(retrofit: Retrofit): ShipmentLaborApiService {
+        return retrofit.create(ShipmentLaborApiService::class.java)
+    }
 }
 
 @Module
@@ -60,4 +69,10 @@ abstract class ShipmentsRepositoryModule {
     abstract fun bindShipmentExpensesRepository(
         shipmentExpensesRepositoryImpl: ShipmentExpensesRepositoryImpl
     ): ShipmentExpensesRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindShipmentLaborRepository(
+        shipmentLaborRepositoryImpl: ShipmentLaborRepositoryImpl
+    ): ShipmentLaborRepository
 }

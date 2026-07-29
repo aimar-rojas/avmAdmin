@@ -9,11 +9,15 @@ import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
 import aimar.rojas.avmadmin.features.selections.data.local.entities.SelectionEntity
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentDao
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentExpenseDao
+import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentLaborDao
 import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentEntity
 import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentExpenseEntity
+import aimar.rojas.avmadmin.features.shipments.data.local.entities.ShipmentLaborEntity
 import aimar.rojas.avmadmin.features.shipments.presentation.components.expenseCategoryLabel
 import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
 import aimar.rojas.avmadmin.features.trades.data.local.entities.TradeEntity
+import aimar.rojas.avmadmin.features.workers.data.local.WorkerDao
+import aimar.rojas.avmadmin.features.workers.data.local.entities.WorkerEntity
 import aimar.rojas.avmadmin.utils.DateUtils
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -55,8 +59,10 @@ private data class CorePendingItems(
 @HiltViewModel
 class PendingSyncViewModel @Inject constructor(
     private val partyDao: PartyDao,
+    private val workerDao: WorkerDao,
     private val shipmentDao: ShipmentDao,
     private val shipmentExpenseDao: ShipmentExpenseDao,
+    private val shipmentLaborDao: ShipmentLaborDao,
     private val tradeDao: TradeDao,
     private val selectionDao: SelectionDao,
     private val apuntesDao: ApuntesDao,
@@ -97,12 +103,16 @@ class PendingSyncViewModel @Inject constructor(
 
             combine(
                 corePendingFlow,
-                shipmentExpenseDao.observePendingSyncExpenses()
-            ) { core, expenses ->
+                workerDao.observePendingSyncWorkers(),
+                shipmentExpenseDao.observePendingSyncExpenses(),
+                shipmentLaborDao.observePendingSyncLabor()
+            ) { core, workers, expenses, labor ->
                 buildList {
                     addAll(core.parties.map { it.toPendingItem() })
+                    addAll(workers.map { it.toPendingItem() })
                     addAll(core.shipments.map { it.toPendingItem() })
                     addAll(expenses.map { it.toPendingItem() })
+                    addAll(labor.map { it.toPendingItem() })
                     addAll(core.trades.map { it.toPendingItem() })
                     addAll(core.selections.map { it.toPendingItem() })
                     addAll(core.apuntes.map { it.toPendingItem() })
@@ -154,12 +164,37 @@ class PendingSyncViewModel @Inject constructor(
         )
     }
 
+    private fun WorkerEntity.toPendingItem(): PendingSyncItem {
+        return PendingSyncItem(
+            id = "worker-$localId",
+            entityLabel = "Personal",
+            title = fullName,
+            subtitle = if (remoteId == null) "Nuevo personal por subir" else "Personal modificado",
+            syncState = syncState,
+            error = syncError,
+            lastAttemptAt = DateUtils.formatSyncTimestampToDisplay(lastSyncAttemptAt)
+        )
+    }
+
     private fun ShipmentExpenseEntity.toPendingItem(): PendingSyncItem {
         return PendingSyncItem(
             id = "shipment-expense-$localId",
             entityLabel = "Costo",
             title = expenseCategoryLabel(category),
             subtitle = "Envío local #$shipmentLocalId - S/ ${"%.2f".format(amount)}",
+            syncState = syncState,
+            error = syncError,
+            lastAttemptAt = DateUtils.formatSyncTimestampToDisplay(lastSyncAttemptAt)
+        )
+    }
+
+    private fun ShipmentLaborEntity.toPendingItem(): PendingSyncItem {
+        val displayWorkDate = DateUtils.convertApiToDisplayDate(workDate) ?: workDate
+        return PendingSyncItem(
+            id = "shipment-labor-$localId",
+            entityLabel = "Jornal",
+            title = "Personal local #$workerLocalId",
+            subtitle = "Envío local #$shipmentLocalId - $displayWorkDate - S/ ${"%.2f".format(amount)}",
             syncState = syncState,
             error = syncError,
             lastAttemptAt = DateUtils.formatSyncTimestampToDisplay(lastSyncAttemptAt)

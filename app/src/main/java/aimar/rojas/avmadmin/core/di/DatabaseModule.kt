@@ -6,7 +6,9 @@ import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
 import aimar.rojas.avmadmin.features.parties.data.local.PartyDao
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentDao
 import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentExpenseDao
+import aimar.rojas.avmadmin.features.shipments.data.local.ShipmentLaborDao
 import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
+import aimar.rojas.avmadmin.features.workers.data.local.WorkerDao
 import android.content.Context
 import androidx.room.Room
 import androidx.room.migration.Migration
@@ -329,6 +331,57 @@ object DatabaseModule {
         }
     }
 
+    val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `workers` (
+                    `localId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `remoteId` INTEGER,
+                    `fullName` TEXT NOT NULL,
+                    `dni` TEXT,
+                    `phone` TEXT,
+                    `isActive` INTEGER NOT NULL,
+                    `notes` TEXT,
+                    `syncState` TEXT NOT NULL,
+                    `lastSyncAttemptAt` TEXT,
+                    `lastSyncedAt` TEXT,
+                    `serverUpdatedAt` TEXT,
+                    `syncError` TEXT
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `shipment_labor` (
+                    `localId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `remoteId` INTEGER,
+                    `shipmentLocalId` INTEGER NOT NULL,
+                    `workerLocalId` INTEGER NOT NULL,
+                    `workDate` TEXT NOT NULL,
+                    `amount` REAL NOT NULL,
+                    `notes` TEXT,
+                    `syncState` TEXT NOT NULL,
+                    `lastSyncAttemptAt` TEXT,
+                    `lastSyncedAt` TEXT,
+                    `serverUpdatedAt` TEXT,
+                    `syncError` TEXT,
+                    FOREIGN KEY(`shipmentLocalId`) REFERENCES `shipments`(`localId`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`workerLocalId`) REFERENCES `workers`(`localId`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_workers_remoteId` ON `workers` (`remoteId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_workers_fullName` ON `workers` (`fullName`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_workers_isActive` ON `workers` (`isActive`)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_shipment_labor_remoteId` ON `shipment_labor` (`remoteId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_shipment_labor_shipmentLocalId` ON `shipment_labor` (`shipmentLocalId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_shipment_labor_workerLocalId` ON `shipment_labor` (`workerLocalId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_shipment_labor_workDate` ON `shipment_labor` (`workDate`)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_shipment_labor_shipmentLocalId_workerLocalId_workDate` ON `shipment_labor` (`shipmentLocalId`, `workerLocalId`, `workDate`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideAvmDatabase(@ApplicationContext context: Context): AvmDatabase {
@@ -336,7 +389,7 @@ object DatabaseModule {
             context,
             AvmDatabase::class.java,
             "avm_database"
-        ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+        ).addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
          .fallbackToDestructiveMigration(dropAllTables = true)
          .build()
     }
@@ -355,6 +408,12 @@ object DatabaseModule {
 
     @Provides
     @Singleton
+    fun provideWorkerDao(database: AvmDatabase): WorkerDao {
+        return database.workerDao
+    }
+
+    @Provides
+    @Singleton
     fun provideShipmentDao(database: AvmDatabase): ShipmentDao {
         return database.shipmentDao
     }
@@ -363,6 +422,12 @@ object DatabaseModule {
     @Singleton
     fun provideShipmentExpenseDao(database: AvmDatabase): ShipmentExpenseDao {
         return database.shipmentExpenseDao
+    }
+
+    @Provides
+    @Singleton
+    fun provideShipmentLaborDao(database: AvmDatabase): ShipmentLaborDao {
+        return database.shipmentLaborDao
     }
 
     @Provides
