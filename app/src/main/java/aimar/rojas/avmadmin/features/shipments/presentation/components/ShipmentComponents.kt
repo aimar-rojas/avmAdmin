@@ -19,18 +19,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +37,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -57,9 +55,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import java.util.Date
 
 @Composable
@@ -357,7 +354,7 @@ private fun ShipmentDateField(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateTradeDialog(
+fun CreateTradeBottomSheet(
     uiState: ShipmentsDetailUiState,
     onDismiss: () -> Unit,
     onPartySelected: (Int) -> Unit,
@@ -421,223 +418,272 @@ fun CreateTradeDialog(
     }
 
     val focusManager = LocalFocusManager.current
+    val isPurchase = uiState.createTradeType == "PURCHASE"
+    val tradeLabel = if (isPurchase) "compra" else "venta"
+    val title = if (isPurchase) "Nueva compra" else "Nueva venta"
+    val partyLabel = if (isPurchase) "Productor" else "Comprador"
+    val partiesList = remember(uiState.createTradeType, uiState.suppliers, uiState.clients) {
+        if (isPurchase) uiState.suppliers else uiState.clients
+    }
+    val selectedParty = remember(partiesList, uiState.createPartyId) {
+        partiesList.find { it.partyId == uiState.createPartyId }
+    }
+    val selectedPartyName = selectedParty?.aliasName
+        ?: selectedParty?.let { listOf(it.firstName, it.lastName).filter { name -> !name.isNullOrBlank() }.joinToString(" ") }
+        ?: ""
+    val selectedStartDate = DateUtils.convertApiToDisplayDate(uiState.createStartDatetime.substringBefore("T")).orEmpty()
+    val selectedEndDate = DateUtils.convertApiToDisplayDate(uiState.createEndDatetime.substringBefore("T")).orEmpty()
+    val previewText = buildString {
+        append(if (isPurchase) "Compra" else "Venta")
+        if (uiState.createVarietyAvocado.isNotBlank()) {
+            append(" de ")
+            append(uiState.createVarietyAvocado)
+        }
+        if (selectedStartDate.isNotBlank()) {
+            append(" desde ")
+            append(selectedStartDate)
+        }
+        if (uiState.createStatus == "CLOSED" && selectedEndDate.isNotBlank()) {
+            append(" hasta ")
+            append(selectedEndDate)
+        }
+    }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .wrapContentHeight(),
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+    AvmFormBottomSheet(
+        title = title,
+        subtitle = "Registra los datos principales para continuar con selecciones, precios y pesas.",
+        leadingIcon = Icons.Filled.ShoppingCart,
+        onDismiss = onDismiss,
+        footer = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = if (uiState.createTradeType == "PURCHASE") "Nueva Compra" else "Nueva Venta",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface
+                AvmSecondaryButton(
+                    text = "Cancelar",
+                    onClick = onDismiss,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier.weight(1f)
                 )
+                AvmPrimaryButton(
+                    text = "Crear",
+                    onClick = onCreate,
+                    isLoading = uiState.isLoading,
+                    loadingText = "Creando",
+                    leadingIcon = Icons.Filled.Save,
+                    size = AvmButtonSize.Large,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            var partyExpanded by remember { mutableStateOf(false) }
+            var varietyExpanded by remember { mutableStateOf(false) }
+            val varieties = remember { listOf("Fuerte", "Hass", "Naval", "Villacampa", "Corriente") }
 
-                // Party selection Dropdown
-                var expanded by remember { mutableStateOf(false) }
-                val partiesList = remember(uiState.createTradeType, uiState.suppliers, uiState.clients) {
-                    if (uiState.createTradeType == "PURCHASE") uiState.suppliers else uiState.clients
+            FormSectionTitle("Contacto")
+            ExposedDropdownMenuBox(
+                expanded = partyExpanded,
+                onExpandedChange = {
+                    partyExpanded = !partyExpanded
+                    if (partyExpanded) focusManager.clearFocus()
                 }
-                val selectedParty = remember(partiesList, uiState.createPartyId) {
-                    partiesList.find { it.partyId == uiState.createPartyId }
-                }
-                val labelParty = if (uiState.createTradeType == "PURCHASE") "Proveedor" else "Cliente"
-                
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { 
-                        expanded = !expanded
-                        if (expanded) focusManager.clearFocus() 
-                    }
-                ) {
-                    OutlinedTextField(
-                        value = selectedParty?.aliasName ?: selectedParty?.firstName ?: "",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(labelParty) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                        },
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.None)
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        partiesList.forEach { party ->
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(party.aliasName ?: "${party.firstName} ${party.lastName}") },
-                                onClick = {
-                                    onPartySelected(party.partyId)
-                                    expanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-
-                // Status
-                Text("Estado", style = MaterialTheme.typography.labelLarge)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = uiState.createStatus == "OPEN",
-                        onClick = { onStatusChange("OPEN") },
-                        label = { Text("Nueva") },
-                        modifier = Modifier.weight(1f)
-                    )
-                    FilterChip(
-                        selected = uiState.createStatus == "CLOSED",
-                        onClick = { onStatusChange("CLOSED") },
-                        label = { Text("Pasada") },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                // Variety and Discount (Row)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    var varietyExpanded by remember { mutableStateOf(false) }
-                    val varieties = remember { listOf("Fuerte", "Hass", "Naval", "Villacampa", "Corriente") }
-                    
-                    ExposedDropdownMenuBox(
-                        expanded = varietyExpanded,
-                        onExpandedChange = { 
-                            varietyExpanded = !varietyExpanded 
-                            if (varietyExpanded) focusManager.clearFocus()
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        OutlinedTextField(
-                            value = uiState.createVarietyAvocado,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Variedad") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = varietyExpanded) },
-                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.None)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = varietyExpanded,
-                            onDismissRequest = { varietyExpanded = false }
-                        ) {
-                            varieties.forEach { selectionOption ->
-                                androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text(selectionOption) },
-                                    onClick = {
-                                        onVarietyChange(selectionOption)
-                                        varietyExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    OutlinedTextField(
-                        value = uiState.createDiscountWeightPerTray,
-                        onValueChange = onDiscountWeightChange,
-                        label = { Text("Desc Peso") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                }
-
-                // Dates
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = DateUtils.convertApiToDisplayDate(uiState.createStartDatetime.substringBefore("T")).orEmpty(),
-                        onValueChange = onStartDatetimeChange,
-                        label = { Text("Inicio") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        readOnly = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.None)
-                    )
-                    IconButton(onClick = { 
-                        focusManager.clearFocus()
-                        onShowStartDateTimePicker() 
-                    }) {
-                        Icon(Icons.Filled.CalendarToday, "Fecha inicio")
-                    }
-                }
-
-                if (uiState.createStatus == "CLOSED") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = DateUtils.convertApiToDisplayDate(uiState.createEndDatetime.substringBefore("T")).orEmpty(),
-                            onValueChange = onEndDatetimeChange,
-                            label = { Text("Fin") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            readOnly = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.None)
-                        )
-                        IconButton(onClick = { 
-                            focusManager.clearFocus()
-                            onShowEndDateTimePicker() 
-                        }) {
-                            Icon(Icons.Filled.CalendarToday, "Fecha fin")
-                        }
-                    }
-                }
-
-                if (uiState.error != null) {
-                    Text(text = uiState.error ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-                
-                // Actions
-                Row(
+            ) {
+                OutlinedTextField(
+                    value = selectedPartyName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(partyLabel) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = partyExpanded)
+                    },
+                    supportingText = {
+                        Text(if (partiesList.isEmpty()) "No hay ${partyLabel.lowercase()}es registrados" else "Selecciona el ${partyLabel.lowercase()} de esta $tradeLabel")
+                    },
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.None)
+                )
+                ExposedDropdownMenu(
+                    expanded = partyExpanded,
+                    onDismissRequest = { partyExpanded = false }
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancelar") }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = onCreate,
-                        enabled = !uiState.isLoading,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        if (uiState.isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                        } else {
-                            Text("Crear")
-                        }
+                    partiesList.forEach { party ->
+                        val displayName = party.aliasName
+                            ?: listOf(party.firstName, party.lastName).filter { !it.isNullOrBlank() }.joinToString(" ")
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(displayName) },
+                            onClick = {
+                                onPartySelected(party.partyId)
+                                partyExpanded = false
+                            }
+                        )
                     }
                 }
             }
+
+            FormSectionTitle("Estado")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = uiState.createStatus == "OPEN",
+                    onClick = { onStatusChange("OPEN") },
+                    label = { Text("Nueva") },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = uiState.createStatus == "CLOSED",
+                    onClick = { onStatusChange("CLOSED") },
+                    label = { Text("Pasada") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            FormSectionTitle("Producto")
+            ExposedDropdownMenuBox(
+                expanded = varietyExpanded,
+                onExpandedChange = {
+                    varietyExpanded = !varietyExpanded
+                    if (varietyExpanded) focusManager.clearFocus()
+                }
+            ) {
+                OutlinedTextField(
+                    value = uiState.createVarietyAvocado,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Variedad") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = varietyExpanded) },
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.None)
+                )
+                ExposedDropdownMenu(
+                    expanded = varietyExpanded,
+                    onDismissRequest = { varietyExpanded = false }
+                ) {
+                    varieties.forEach { selectionOption ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(selectionOption) },
+                            onClick = {
+                                onVarietyChange(selectionOption)
+                                varietyExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = uiState.createDiscountWeightPerTray,
+                onValueChange = onDiscountWeightChange,
+                label = { Text("Descuento por jaba") },
+                suffix = { Text("kg") },
+                supportingText = { Text("Kg descontados por cada jaba") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
+
+            FormSectionTitle("Fechas")
+            TradeDateField(
+                label = "Fecha de inicio",
+                value = selectedStartDate,
+                onOpenPicker = {
+                    focusManager.clearFocus()
+                    onShowStartDateTimePicker()
+                }
+            )
+
+            if (uiState.createStatus == "CLOSED") {
+                TradeDateField(
+                    label = "Fecha de fin",
+                    value = selectedEndDate,
+                    onOpenPicker = {
+                        focusManager.clearFocus()
+                        onShowEndDateTimePicker()
+                    }
+                )
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Text(
+                    text = previewText.ifBlank { "Completa los datos para crear la $tradeLabel." },
+                    modifier = Modifier.padding(14.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            uiState.error?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FormSectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.SemiBold
+    )
+}
+
+@Composable
+private fun TradeDateField(
+    label: String,
+    value: String,
+    onOpenPicker: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            label = { Text(label) },
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            readOnly = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.None),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+        IconButton(
+            onClick = onOpenPicker,
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CalendarToday,
+                contentDescription = "Seleccionar $label"
+            )
         }
     }
 }

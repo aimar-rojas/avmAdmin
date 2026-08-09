@@ -1,7 +1,7 @@
 package aimar.rojas.avmadmin.features.shipments.presentation
 
 import aimar.rojas.avmadmin.domain.model.Trade
-import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateTradeDialog
+import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateTradeBottomSheet
 import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateShipmentLaborBottomSheet
 import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateShipmentExpenseBottomSheet
 import aimar.rojas.avmadmin.features.shipments.presentation.components.ShipmentExpenseItem
@@ -176,7 +176,7 @@ fun ShipmentsDetailScreen(
         }
 
         if (uiState.showCreateDialog) {
-            CreateTradeDialog(
+            CreateTradeBottomSheet(
                 uiState = uiState,
                 onDismiss = { viewModel.hideCreateDialog() },
                 onPartySelected = { viewModel.onPartySelected(it) },
