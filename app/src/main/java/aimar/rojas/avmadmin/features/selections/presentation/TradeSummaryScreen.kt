@@ -17,9 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -55,6 +55,7 @@ fun TradeSummaryScreen(
     viewModel: TradeSummaryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
@@ -79,11 +80,15 @@ fun TradeSummaryScreen(
         },
         bottomBar = {
             Button(
-                onClick = { viewModel.saveAndFinish() },
+                onClick = {
+                    viewModel.saveAndShare { trade, selections ->
+                        shareTradeSummaryToWhatsApp(context, trade, selections)
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                enabled = !uiState.isSaving,
+                enabled = !uiState.isSaving && !uiState.isLoading && uiState.workedSelections.isNotEmpty(),
                 shape = MaterialTheme.shapes.medium
             ) {
                 if (uiState.isSaving) {
@@ -93,9 +98,9 @@ fun TradeSummaryScreen(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Icon(Icons.Default.Check, contentDescription = null)
+                    Icon(Icons.Default.Share, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Finalizar y Guardar", style = MaterialTheme.typography.titleMedium)
+                    Text("Compartir por WhatsApp", style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
@@ -169,7 +174,10 @@ fun SelectionSummaryCard(
     item: SelectionSummaryItem,
     onPriceChange: (String) -> Unit
 ) {
-    val selectionColor = getSelectionColorSummary(item.selectionDetail.selectionTypeId)
+    val selectionColor = selectionColorFor(
+        item.selectionDetail.selectionTypeId,
+        item.selectionDetail.selectionTypeName
+    )
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -194,7 +202,11 @@ fun SelectionSummaryCard(
                     text = item.selectionDetail.selectionTypeName ?: "Selección",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = if (selectionColor == Color.Black) MaterialTheme.colorScheme.onSurface else selectionColor
+                    color = if (selectionColor == Color.Black || isLightSelectionColor(selectionColor)) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        selectionColor
+                    }
                 )
             }
             
@@ -254,18 +266,5 @@ fun SummaryDataPoint(label: String, value: String, highlight: Boolean = false) {
             fontWeight = if (highlight) FontWeight.Bold else FontWeight.Medium,
             color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
-    }
-}
-
-private fun getSelectionColorSummary(id: Int): Color {
-    return when (id) {
-        1 -> Color.Black      // Sin pita
-        2 -> Color(0xFF4CAF50) // Verde
-        3 -> Color(0xFFB0BEC5) // Blanco (más oscuro para fondo blanco)
-        4 -> Color(0xFFF44336) // Rojo
-        5 -> Color(0xFF2196F3) // Azul
-        6 -> Color(0xFF9C27B0) // Morado
-        7 -> Color(0xFFFFEB3B) // Amarillo
-        else -> Color.Black
     }
 }

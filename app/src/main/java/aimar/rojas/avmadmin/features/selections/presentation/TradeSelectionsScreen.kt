@@ -122,7 +122,7 @@ fun TradeSelectionsContent(
     onHideSelectionManager: () -> Unit,
     onToggleSelectionVisibility: (Int) -> Unit
 ) {
-    val accentColor = getSelectionColor(uiState.selectedSelectionTypeId)
+    val accentColor = selectionColorFor(uiState.selectedSelectionTypeId)
     var unitWeightToDelete by remember { mutableStateOf<UnitWeightDetail?>(null) }
 
     Scaffold(
@@ -274,20 +274,6 @@ fun TradeSelectionsContent(
     }
 }
 
-private fun getSelectionColor(id: Int): Color {
-    return when (id) {
-        1 -> Color.Black      // Sin pita
-        2 -> Color(0xFF4CAF50) // Verde
-        3 -> Color(0xFFE0E0E0) // Blanco (Gris claro para visibilidad)
-        4 -> Color(0xFFE91E63) // Rosado
-        5 -> Color(0xFFFF9800) // Naranja
-        6 -> Color(0xFF2196F3) // Azul
-        7 -> Color(0xFF9C27B0) // Morado
-        8 -> Color(0xFFFFEB3B) // Amarillo
-        else -> Color.Black
-    }
-}
-
 @Composable
 fun TradeSummaryHeader(
     totalGrossWeight: Double,
@@ -298,7 +284,7 @@ fun TradeSummaryHeader(
 ) {
     val isDarkMode = isSystemInDarkTheme()
     val textColor = when {
-        accentColor == Color(0xFFE0E0E0) -> Color.Black
+        isLightSelectionColor(accentColor) -> Color.Black
         accentColor == Color.Black && isDarkMode -> Color.White
         else -> accentColor
     }
@@ -548,7 +534,7 @@ fun UnitWeightItem(
                 text = String.format(Locale.getDefault(), "%.2f kg neto", netWeight),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = if (accentColor == Color(0xFFE0E0E0)) Color.Black else accentColor
+                color = if (isLightSelectionColor(accentColor)) Color.Black else accentColor
             )
         }
     }
@@ -710,7 +696,7 @@ fun SelectionTypeToggleItem(
     onToggle: () -> Unit,
     canDisable: Boolean
 ) {
-    val selectionColor = getSelectionColor(selectionType.id)
+    val selectionColor = selectionColorFor(selectionType.id, selectionType.name)
     val canToggle = !isVisible || canDisable
     
     Surface(
@@ -749,7 +735,7 @@ fun SelectionTypeToggleItem(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = null,
-                                tint = if (selectionColor == Color.Black || selectionColor == Color(0xFFE0E0E0)) {
+                                tint = if (selectionColor == Color.Black) {
                                     Color.White
                                 } else {
                                     Color.Black

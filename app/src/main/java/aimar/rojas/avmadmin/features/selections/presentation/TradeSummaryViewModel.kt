@@ -116,24 +116,42 @@ class TradeSummaryViewModel @Inject constructor(
     fun saveAndFinish() {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
-            
+
             try {
-                _uiState.value.workedSelections.forEach { item ->
-                    val newPrice = item.pricePerKg.toDoubleOrNull()
-                    val oldPrice = item.selectionDetail.price
-                    
-                    // Only update and mark as pending if there's a difference
-                    if (newPrice != oldPrice || item.selectionDetail.isPendingSync) {
-                        val updatedSelection = item.selectionDetail.copy(
-                            price = newPrice,
-                            isPendingSync = true
-                        )
-                        selectionsRepository.saveSelectionLocal(updatedSelection)
-                    }
-                }
+                savePricesToLocal()
                 _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSaving = false, error = "Error al guardar los precios") }
+            }
+        }
+    }
+
+    fun saveAndShare(onReady: (Trade?, List<SelectionSummaryItem>) -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true, error = null) }
+
+            try {
+                savePricesToLocal()
+                _uiState.update { it.copy(isSaving = false) }
+                onReady(_uiState.value.trade, _uiState.value.workedSelections)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSaving = false, error = "Error al preparar el resumen") }
+            }
+        }
+    }
+
+    private suspend fun savePricesToLocal() {
+        _uiState.value.workedSelections.forEach { item ->
+            val newPrice = item.pricePerKg.toDoubleOrNull()
+            val oldPrice = item.selectionDetail.price
+
+            // Only update and mark as pending if there's a difference
+            if (newPrice != oldPrice || item.selectionDetail.isPendingSync) {
+                val updatedSelection = item.selectionDetail.copy(
+                    price = newPrice,
+                    isPendingSync = true
+                )
+                selectionsRepository.saveSelectionLocal(updatedSelection)
             }
         }
     }
