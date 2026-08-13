@@ -2,10 +2,13 @@ package aimar.rojas.avmadmin.features.workers.presentation.components
 
 import aimar.rojas.avmadmin.core.sync.SyncState
 import aimar.rojas.avmadmin.features.workers.domain.model.Worker
+import aimar.rojas.avmadmin.ui.components.AvmActionBottomSheet
 import aimar.rojas.avmadmin.ui.components.AvmButtonSize
 import aimar.rojas.avmadmin.ui.components.AvmFormBottomSheet
 import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 import aimar.rojas.avmadmin.ui.components.AvmSecondaryButton
+import aimar.rojas.avmadmin.ui.components.AvmSheetAction
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Save
@@ -45,13 +50,27 @@ data class WorkerCreateUiState(
     val error: String? = null
 )
 
+data class WorkerEditUiState(
+    val workerId: Int = 0,
+    val fullName: String = "",
+    val dni: String = "",
+    val phone: String = "",
+    val isActive: Boolean = true,
+    val notes: String = "",
+    val isLoading: Boolean = false,
+    val error: String? = null
+)
+
 @Composable
 fun WorkerSummaryCard(
     worker: Worker,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -95,6 +114,86 @@ fun WorkerSummaryCard(
                 WorkerSyncChip(syncState = worker.syncState)
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WorkerActionsBottomSheet(
+    worker: Worker,
+    onDismiss: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    AvmActionBottomSheet(
+        title = worker.fullName,
+        subtitle = worker.dni?.takeIf { it.isNotBlank() }?.let { "DNI $it" } ?: "Personal",
+        onDismiss = onDismiss,
+        actions = listOf(
+            AvmSheetAction(
+                title = "Editar datos",
+                description = "Nombre, DNI, teléfono y notas",
+                icon = Icons.Filled.Edit,
+                onClick = onEdit
+            ),
+            AvmSheetAction(
+                title = "Eliminar personal",
+                description = "Se ocultará de la lista y de nuevos jornales",
+                icon = Icons.Filled.Delete,
+                onClick = onDelete
+            )
+        ),
+        content = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                WorkerDetailLine("Nombre", worker.fullName)
+                WorkerDetailLine("DNI", worker.dni)
+                WorkerDetailLine("Teléfono", worker.phone)
+                WorkerDetailLine("Nota", worker.notes)
+            }
+        },
+        footer = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AvmSecondaryButton(
+                    text = "Cerrar",
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                )
+                AvmPrimaryButton(
+                    text = "Editar",
+                    onClick = onEdit,
+                    leadingIcon = Icons.Filled.Edit,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun WorkerDetailLine(label: String, value: String?) {
+    if (value.isNullOrBlank()) return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
@@ -223,5 +322,177 @@ fun CreateWorkerBottomSheet(
                 fontWeight = FontWeight.SemiBold
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditWorkerBottomSheet(
+    uiState: WorkerEditUiState,
+    onDismiss: () -> Unit,
+    onFullNameChange: (String) -> Unit,
+    onDniChange: (String) -> Unit,
+    onPhoneChange: (String) -> Unit,
+    onNotesChange: (String) -> Unit,
+    onSave: () -> Unit
+) {
+    AvmFormBottomSheet(
+        title = "Editar personal",
+        subtitle = "Actualiza los datos que usas para registrar jornales.",
+        leadingIcon = Icons.Filled.Edit,
+        onDismiss = onDismiss,
+        footer = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AvmSecondaryButton(
+                    text = "Cancelar",
+                    onClick = onDismiss,
+                    enabled = !uiState.isLoading,
+                    modifier = Modifier.weight(1f)
+                )
+                AvmPrimaryButton(
+                    text = "Guardar",
+                    onClick = onSave,
+                    isLoading = uiState.isLoading,
+                    loadingText = "Guardando",
+                    leadingIcon = Icons.Filled.Save,
+                    size = AvmButtonSize.Large,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    ) {
+        WorkerFields(
+            fullName = uiState.fullName,
+            dni = uiState.dni,
+            phone = uiState.phone,
+            notes = uiState.notes,
+            error = uiState.error,
+            onFullNameChange = onFullNameChange,
+            onDniChange = onDniChange,
+            onPhoneChange = onPhoneChange,
+            onNotesChange = onNotesChange
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DeleteWorkerBottomSheet(
+    worker: Worker,
+    isLoading: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AvmActionBottomSheet(
+        title = "Eliminar personal",
+        subtitle = worker.fullName,
+        onDismiss = onDismiss,
+        content = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Se ocultará de la lista de personal activo y no aparecerá para nuevos jornales. Los jornales antiguos se conservarán.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                error?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        },
+        footer = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AvmSecondaryButton(
+                    text = "Cancelar",
+                    onClick = onDismiss,
+                    enabled = !isLoading,
+                    modifier = Modifier.weight(1f)
+                )
+                AvmPrimaryButton(
+                    text = "Eliminar",
+                    onClick = onConfirm,
+                    isLoading = isLoading,
+                    loadingText = "Eliminando",
+                    leadingIcon = Icons.Filled.Delete,
+                    size = AvmButtonSize.Large,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun WorkerFields(
+    fullName: String,
+    dni: String,
+    phone: String,
+    notes: String,
+    error: String?,
+    onFullNameChange: (String) -> Unit,
+    onDniChange: (String) -> Unit,
+    onPhoneChange: (String) -> Unit,
+    onNotesChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = fullName,
+        onValueChange = onFullNameChange,
+        label = { Text("Nombre completo") },
+        leadingIcon = { androidx.compose.material3.Icon(Icons.Filled.Badge, contentDescription = null) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        OutlinedTextField(
+            value = dni,
+            onValueChange = onDniChange,
+            label = { Text("DNI") },
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+        )
+        OutlinedTextField(
+            value = phone,
+            onValueChange = onPhoneChange,
+            label = { Text("Teléfono") },
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+        )
+    }
+
+    OutlinedTextField(
+        value = notes,
+        onValueChange = onNotesChange,
+        label = { Text("Nota") },
+        modifier = Modifier.fillMaxWidth(),
+        minLines = 2
+    )
+
+    error?.let {
+        Text(
+            text = it,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }

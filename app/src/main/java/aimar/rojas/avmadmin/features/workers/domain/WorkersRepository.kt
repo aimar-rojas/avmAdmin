@@ -12,4 +12,15 @@ interface WorkersRepository {
         phone: String?,
         notes: String?
     ): Result<Worker>
+
+    suspend fun updateWorker(
+        workerId: Int,
+        fullName: String,
+        dni: String?,
+        phone: String?,
+        isActive: Boolean,
+        notes: String?
+    ): Result<Worker>
+
+    suspend fun deactivateWorker(workerId: Int): Result<Unit>
 }
