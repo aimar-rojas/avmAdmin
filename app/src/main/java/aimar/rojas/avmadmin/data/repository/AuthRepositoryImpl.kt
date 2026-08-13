@@ -55,13 +55,15 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun register(
         username: String,
         email: String,
-        password: String
+        password: String,
+        registrationKey: String
     ): Result<RegisterResponse> {
         return try {
             val request = RegisterRequest(
                 username = username,
                 email = email,
-                password = password
+                password = password,
+                registrationKey = registrationKey
             )
             val response = authApiService.register(request)
             

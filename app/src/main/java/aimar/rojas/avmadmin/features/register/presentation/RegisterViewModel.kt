@@ -34,6 +34,10 @@ class RegisterViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(confirmPassword = confirmPassword, error = null)
     }
 
+    fun onRegistrationKeyChange(registrationKey: String) {
+        _uiState.value = _uiState.value.copy(registrationKey = registrationKey, error = null)
+    }
+
     fun register() {
         val currentState = _uiState.value
         
@@ -73,13 +77,19 @@ class RegisterViewModel @Inject constructor(
             return
         }
 
+        if (currentState.registrationKey.isBlank()) {
+            _uiState.value = currentState.copy(error = "La clave de registro es requerida")
+            return
+        }
+
         viewModelScope.launch {
             _uiState.value = currentState.copy(isLoading = true, error = null)
             
             authRepository.register(
                 username = currentState.username,
                 email = currentState.email,
-                password = currentState.password
+                password = currentState.password,
+                registrationKey = currentState.registrationKey
             )
                 .onSuccess { registerResponse ->
                     _uiState.value = currentState.copy(
@@ -107,6 +117,7 @@ data class RegisterUiState(
     val email: String = "",
     val password: String = "",
     val confirmPassword: String = "",
+    val registrationKey: String = "",
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
     val error: String? = null,
