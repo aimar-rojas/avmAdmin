@@ -99,7 +99,7 @@ class TradesRepositoryImpl @Inject constructor(
 
             if (entity.remoteId != null && entity.syncState != SyncState.PENDING_CREATE) {
                 val response = tradesApiService.deleteTrade(entity.remoteId)
-                if (!response.isSuccessful) {
+                if (!response.isSuccessful && response.code() != 404) {
                     val error = response.errorBody()?.string()
                     return Result.failure(Exception(error ?: "No se pudo eliminar en el servidor"))
                 }

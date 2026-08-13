@@ -44,4 +44,10 @@ interface TradeDao {
 
     @Query("DELETE FROM trades WHERE localId = :tradeId")
     suspend fun deleteTradeById(tradeId: Int)
+
+    @Query("SELECT localId FROM trades WHERE remoteId IS NOT NULL AND syncState = 'CLEAN'")
+    suspend fun getCleanRemoteTradeLocalIds(): List<Int>
+
+    @Query("SELECT localId FROM trades WHERE remoteId IS NOT NULL AND syncState = 'CLEAN' AND remoteId NOT IN (:activeRemoteIds)")
+    suspend fun getCleanRemoteTradeLocalIdsMissingFromRemote(activeRemoteIds: List<Int>): List<Int>
 }

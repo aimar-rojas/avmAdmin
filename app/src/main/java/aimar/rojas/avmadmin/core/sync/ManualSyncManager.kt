@@ -766,20 +766,24 @@ class ManualSyncManager @Inject constructor(
         _status.update { it.copy(phase = "Actualizando negocios") }
         val now = nowIso()
         var page = 1
+        val activeRemoteIds = mutableSetOf<Int>()
         do {
             val response = tradesApiService.getTrades(
                 shipmentId = null,
                 page = page,
-                limit = PULL_PAGE_LIMIT,
-                updatedAfter = INITIAL_SYNC_UPDATED_AFTER
+                limit = PULL_PAGE_LIMIT
             )
             val body = response.body()
             if (!response.isSuccessful || body == null) {
                 return response.toPullErrorMessage("negocios")
             }
-            body.trades.forEach { dto -> upsertRemoteTrade(dto, now) }
+            body.trades.forEach { dto ->
+                activeRemoteIds.add(dto.tradeId)
+                upsertRemoteTrade(dto, now)
+            }
             page += 1
         } while (body.hasNext)
+        deleteTradesMissingFromRemote(activeRemoteIds)
         sessionDataStore.saveLastTradeSync(now)
         return null
     }
@@ -989,6 +993,22 @@ class ManualSyncManager @Inject constructor(
                 serverUpdatedAt = dto.updatedAt
             )
         )
+    }
+
+    private suspend fun deleteTradesMissingFromRemote(activeRemoteIds: Set<Int>) {
+        val staleLocalIds = if (activeRemoteIds.isEmpty()) {
+            tradeDao.getCleanRemoteTradeLocalIds()
+        } else {
+            tradeDao.getCleanRemoteTradeLocalIdsMissingFromRemote(activeRemoteIds.toList())
+        }
+        if (staleLocalIds.isEmpty()) return
+
+        database.withTransaction {
+            staleLocalIds.forEach { localId ->
+                selectionDao.deleteSelectionsByTradeId(localId)
+                tradeDao.deleteTradeById(localId)
+            }
+        }
     }
 
     private suspend fun upsertRemoteSelection(dto: SelectionByTradeDto, now: String) {
@@ -1283,6 +1303,5 @@ class ManualSyncManager @Inject constructor(
     companion object {
         private const val TAG = "ManualSyncManager"
         private const val PULL_PAGE_LIMIT = 200
-        private const val INITIAL_SYNC_UPDATED_AFTER = "2000-01-01T00:00:00Z"
     }
 }
