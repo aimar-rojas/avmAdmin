@@ -1,0 +1,4 @@
+interface:
+  display_name: "Unit Test Feature"
+  short_description: "Create Android feature unit tests"
+  default_prompt: "Use $unit-test-feature to add unit tests for this Android feature."

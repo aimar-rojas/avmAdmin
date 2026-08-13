@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix ProGuard Model"
+  short_description: "Fix release model obfuscation issues"
+  default_prompt: "Use $fix-proguard-model to diagnose and fix a release-only JSON/model obfuscation issue."

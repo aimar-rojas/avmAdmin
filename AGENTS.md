@@ -67,6 +67,11 @@ Cuando sea posible antes de cerrar cambios, ejecutar las verificaciones Gradle a
 - Se pueden agregar librerías Android cuando exista una razón técnica clara.
 - Antes de agregar una dependencia, revisar si el stack actual ya cubre el caso.
 
+## Skills Locales
+
+- `fix-proguard-model`: usar para fallos de release/R8/ProGuard relacionados con modelos, serialización, Gson/Retrofit, reflection o crashes que no pasan en debug.
+- `unit-test-feature`: usar para crear o mejorar tests unitarios de features, ViewModels, UseCases, Repositories, mappers y estados UI.
+
 ## Convenciones
 
 - Código en inglés.
