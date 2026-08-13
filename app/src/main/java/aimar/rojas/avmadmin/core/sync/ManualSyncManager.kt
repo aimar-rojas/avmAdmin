@@ -692,7 +692,7 @@ class ManualSyncManager @Inject constructor(
 
     private suspend fun pullParties(): String? {
         _status.update { it.copy(phase = "Actualizando contactos") }
-        val response = partiesApiService.getParties(updatedAfter = sessionDataStore.getLastPartySync())
+        val response = partiesApiService.getParties()
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             return response.toPullErrorMessage("contactos")
@@ -705,7 +705,7 @@ class ManualSyncManager @Inject constructor(
 
     private suspend fun pullWorkers(): String? {
         _status.update { it.copy(phase = "Actualizando personal") }
-        val response = workersApiService.getWorkers(updatedAfter = sessionDataStore.getLastWorkerSync())
+        val response = workersApiService.getWorkers()
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             return response.toPullErrorMessage("personal")
@@ -718,20 +718,27 @@ class ManualSyncManager @Inject constructor(
 
     private suspend fun pullShipments(): String? {
         _status.update { it.copy(phase = "Actualizando envíos") }
-        val response = shipmentsApiService.getShipments(updatedAfter = sessionDataStore.getLastShipmentSync())
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            return response.toPullErrorMessage("envíos")
-        }
         val now = nowIso()
-        body.shipments.forEach { dto -> upsertRemoteShipment(dto, now) }
+        var page = 1
+        do {
+            val response = shipmentsApiService.getShipments(
+                page = page,
+                limit = PULL_PAGE_LIMIT
+            )
+            val body = response.body()
+            if (!response.isSuccessful || body == null) {
+                return response.toPullErrorMessage("envíos")
+            }
+            body.shipments.forEach { dto -> upsertRemoteShipment(dto, now) }
+            page += 1
+        } while (body.hasNext)
         sessionDataStore.saveLastShipmentSync(now)
         return null
     }
 
     private suspend fun pullShipmentExpenses(): String? {
         _status.update { it.copy(phase = "Actualizando costos de envío") }
-        val response = shipmentExpensesApiService.getExpenses(updatedAfter = sessionDataStore.getLastShipmentExpenseSync())
+        val response = shipmentExpensesApiService.getExpenses()
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             return response.toPullErrorMessage("costos de envío")
@@ -744,7 +751,7 @@ class ManualSyncManager @Inject constructor(
 
     private suspend fun pullShipmentLabor(): String? {
         _status.update { it.copy(phase = "Actualizando jornales") }
-        val response = shipmentLaborApiService.getLabor(updatedAfter = sessionDataStore.getLastShipmentLaborSync())
+        val response = shipmentLaborApiService.getLabor()
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             return response.toPullErrorMessage("jornales")
@@ -757,21 +764,29 @@ class ManualSyncManager @Inject constructor(
 
     private suspend fun pullTrades(): String? {
         _status.update { it.copy(phase = "Actualizando negocios") }
-        val lastSync = sessionDataStore.getLastTradeSync() ?: "2000-01-01T00:00:00Z"
-        val response = tradesApiService.getTrades(shipmentId = null, updatedAfter = lastSync)
-        val body = response.body()
-        if (!response.isSuccessful || body == null) {
-            return response.toPullErrorMessage("negocios")
-        }
         val now = nowIso()
-        body.trades.forEach { dto -> upsertRemoteTrade(dto, now) }
+        var page = 1
+        do {
+            val response = tradesApiService.getTrades(
+                shipmentId = null,
+                page = page,
+                limit = PULL_PAGE_LIMIT,
+                updatedAfter = INITIAL_SYNC_UPDATED_AFTER
+            )
+            val body = response.body()
+            if (!response.isSuccessful || body == null) {
+                return response.toPullErrorMessage("negocios")
+            }
+            body.trades.forEach { dto -> upsertRemoteTrade(dto, now) }
+            page += 1
+        } while (body.hasNext)
         sessionDataStore.saveLastTradeSync(now)
         return null
     }
 
     private suspend fun pullSelections(): String? {
         _status.update { it.copy(phase = "Actualizando selecciones") }
-        val response = selectionsApiService.getSelections(updatedAfter = sessionDataStore.getLastSelectionSync())
+        val response = selectionsApiService.getSelections()
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             return response.toPullErrorMessage("selecciones")
@@ -1267,5 +1282,7 @@ class ManualSyncManager @Inject constructor(
 
     companion object {
         private const val TAG = "ManualSyncManager"
+        private const val PULL_PAGE_LIMIT = 200
+        private const val INITIAL_SYNC_UPDATED_AFTER = "2000-01-01T00:00:00Z"
     }
 }
