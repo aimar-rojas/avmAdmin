@@ -41,4 +41,7 @@ interface TradeDao {
 
     @Query("SELECT COUNT(*) FROM trades")
     suspend fun getTradeCount(): Int
+
+    @Query("DELETE FROM trades WHERE localId = :tradeId")
+    suspend fun deleteTradeById(tradeId: Int)
 }

@@ -6,6 +6,7 @@ import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateShi
 import aimar.rojas.avmadmin.features.shipments.presentation.components.CreateShipmentExpenseBottomSheet
 import aimar.rojas.avmadmin.features.shipments.presentation.components.ShipmentExpenseItem
 import aimar.rojas.avmadmin.features.shipments.presentation.components.ShipmentLaborItem
+import aimar.rojas.avmadmin.ui.components.AvmActionBottomSheet
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -110,7 +111,8 @@ fun ShipmentsDetailScreen(
                                         partyName = partyName,
                                         isPendingSync = uiState.pendingSyncTradeIds.contains(trade.tradeId),
                                         onSyncClick = { viewModel.syncTrade(trade.tradeId) },
-                                        onClick = { navController.navigate("trade_selections/${trade.tradeId}") }
+                                        onClick = { navController.navigate("trade_selections/${trade.tradeId}") },
+                                        onLongClick = { viewModel.showDeleteTradeDialog(trade) }
                                     )
                                 }
                             }
@@ -133,7 +135,8 @@ fun ShipmentsDetailScreen(
                                         partyName = partyName,
                                         isPendingSync = uiState.pendingSyncTradeIds.contains(trade.tradeId),
                                         onSyncClick = { viewModel.syncTrade(trade.tradeId) },
-                                        onClick = { navController.navigate("trade_selections/${trade.tradeId}") }
+                                        onClick = { navController.navigate("trade_selections/${trade.tradeId}") },
+                                        onLongClick = { viewModel.showDeleteTradeDialog(trade) }
                                     )
                                 }
                             }
@@ -231,6 +234,59 @@ fun ShipmentsDetailScreen(
                 onAmountChange = { viewModel.onLaborAmountChange(it) },
                 onNotesChange = { viewModel.onLaborNotesChange(it) },
                 onSave = { viewModel.createLabor() }
+            )
+        }
+
+        uiState.tradePendingDelete?.let { trade ->
+            val tradeLabel = if (trade.tradeType == "PURCHASE") "compra" else "venta"
+            val partyName = uiState.partyNameForTrade(trade)
+            AvmActionBottomSheet(
+                title = "Eliminar $tradeLabel",
+                subtitle = "Esta acción quitará el registro del envío.",
+                onDismiss = {
+                    if (!uiState.isDeletingTrade) {
+                        viewModel.hideDeleteTradeDialog()
+                    }
+                },
+                content = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Se eliminará el registro de $partyName y sus selecciones asociadas.")
+                        uiState.deleteTradeError?.let { error ->
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                },
+                footer = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TextButton(
+                            onClick = { viewModel.hideDeleteTradeDialog() },
+                            enabled = !uiState.isDeletingTrade,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Cancelar")
+                        }
+
+                        Button(
+                            onClick = { viewModel.deletePendingTrade() },
+                            enabled = !uiState.isDeletingTrade,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            )
+                        ) {
+                            Text(if (uiState.isDeletingTrade) "Eliminando" else "Eliminar")
+                        }
+                    }
+                }
             )
         }
     }

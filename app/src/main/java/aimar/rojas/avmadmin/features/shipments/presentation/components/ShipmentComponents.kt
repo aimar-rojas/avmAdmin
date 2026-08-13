@@ -9,7 +9,9 @@ import aimar.rojas.avmadmin.ui.components.AvmFormBottomSheet
 import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 import aimar.rojas.avmadmin.ui.components.AvmSecondaryButton
 import aimar.rojas.avmadmin.utils.DateUtils
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -688,17 +690,23 @@ private fun TradeDateField(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TradeItem(
     trade: Trade,
     partyName: String,
     isPendingSync: Boolean = false,
     onSyncClick: () -> Unit = {},
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    onLongClick: () -> Unit = {}
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),

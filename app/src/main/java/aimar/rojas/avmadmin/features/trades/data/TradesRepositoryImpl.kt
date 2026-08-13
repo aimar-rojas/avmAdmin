@@ -1,16 +1,22 @@
 package aimar.rojas.avmadmin.features.trades.data
 
 import aimar.rojas.avmadmin.core.sync.SyncState
+import aimar.rojas.avmadmin.core.data.local.AvmDatabase
 import aimar.rojas.avmadmin.domain.model.Trade
 import aimar.rojas.avmadmin.features.trades.data.local.TradeDao
 import aimar.rojas.avmadmin.features.trades.data.local.entities.TradeEntity
 import aimar.rojas.avmadmin.features.trades.domain.TradesRepository
 import aimar.rojas.avmadmin.features.trades.domain.TradesResult
+import aimar.rojas.avmadmin.features.selections.data.local.SelectionDao
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 class TradesRepositoryImpl @Inject constructor(
-    private val tradeDao: TradeDao
+    private val database: AvmDatabase,
+    private val tradeDao: TradeDao,
+    private val selectionDao: SelectionDao,
+    private val tradesApiService: TradesApiService
 ) : TradesRepository {
 
     override suspend fun getTrades(
@@ -81,6 +87,29 @@ class TradesRepositoryImpl @Inject constructor(
             } else {
                 Result.failure(Exception("Trade not found locally"))
             }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun deleteTrade(tradeId: Int): Result<Unit> {
+        return try {
+            val entity = tradeDao.getTradeById(tradeId)
+                ?: return Result.failure(Exception("No se encontró la transacción"))
+
+            if (entity.remoteId != null && entity.syncState != SyncState.PENDING_CREATE) {
+                val response = tradesApiService.deleteTrade(entity.remoteId)
+                if (!response.isSuccessful) {
+                    val error = response.errorBody()?.string()
+                    return Result.failure(Exception(error ?: "No se pudo eliminar en el servidor"))
+                }
+            }
+
+            database.withTransaction {
+                selectionDao.deleteSelectionsByTradeId(tradeId)
+                tradeDao.deleteTradeById(tradeId)
+            }
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

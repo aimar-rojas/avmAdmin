@@ -21,6 +21,8 @@ interface TradesRepository {
     ): Result<Trade>
 
     suspend fun getTradeById(tradeId: Int): Result<Trade>
+
+    suspend fun deleteTrade(tradeId: Int): Result<Unit>
 }
 
 data class TradesResult(

@@ -428,6 +428,52 @@ class ShipmentsDetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(error = null)
     }
 
+    fun showDeleteTradeDialog(trade: Trade) {
+        _uiState.update {
+            it.copy(
+                tradePendingDelete = trade,
+                deleteTradeError = null
+            )
+        }
+    }
+
+    fun hideDeleteTradeDialog() {
+        _uiState.update {
+            it.copy(
+                tradePendingDelete = null,
+                deleteTradeError = null,
+                isDeletingTrade = false
+            )
+        }
+    }
+
+    fun deletePendingTrade() {
+        val trade = _uiState.value.tradePendingDelete ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDeletingTrade = true, deleteTradeError = null) }
+            tradesRepository.deleteTrade(trade.tradeId)
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            isDeletingTrade = false,
+                            tradePendingDelete = null,
+                            deleteTradeError = null
+                        )
+                    }
+                    loadTrades()
+                }
+                .onFailure { exception ->
+                    _uiState.update {
+                        it.copy(
+                            isDeletingTrade = false,
+                            deleteTradeError = exception.message ?: "No se pudo eliminar la transacción"
+                        )
+                    }
+                }
+        }
+    }
+
     fun syncTrade(tradeId: Int) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
@@ -453,6 +499,9 @@ data class ShipmentsDetailUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val pendingSyncTradeIds: Set<Int> = emptySet(),
+    val tradePendingDelete: Trade? = null,
+    val isDeletingTrade: Boolean = false,
+    val deleteTradeError: String? = null,
     
     // Create Trade State
     val showCreateDialog: Boolean = false,

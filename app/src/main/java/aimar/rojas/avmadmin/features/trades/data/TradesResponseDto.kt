@@ -99,3 +99,7 @@ data class CreateTradeResponseDto(
     val message: String,
     val trade: TradeDto
 )
+
+data class DeleteTradeResponseDto(
+    val message: String
+)
