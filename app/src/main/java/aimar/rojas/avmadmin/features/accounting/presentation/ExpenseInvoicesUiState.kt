@@ -4,6 +4,19 @@ import android.net.Uri
 import aimar.rojas.avmadmin.features.accounting.domain.model.ExpenseInvoice
 import aimar.rojas.avmadmin.features.accounting.domain.model.MonthlyInvoiceSummary
 
+enum class InvoiceProcessingStage {
+    IDLE,
+    PREPARING_IMAGE,
+    ANALYZING_WITH_AI,
+    USING_LOCAL_OCR,
+    COMPLETED
+}
+
+enum class InvoiceExtractionSource {
+    AI,
+    LOCAL_OCR
+}
+
 data class ExpenseInvoicesUiState(
     val isLoading: Boolean = false,
     val invoices: List<ExpenseInvoice> = emptyList(),
@@ -16,6 +29,8 @@ data class ExpenseInvoicesUiState(
 data class ScanInvoiceFormUiState(
     val scannedImageUri: Uri? = null,
     val isOcrProcessing: Boolean = false,
+    val processingStage: InvoiceProcessingStage = InvoiceProcessingStage.IDLE,
+    val extractionSource: InvoiceExtractionSource? = null,
     val isSubmitting: Boolean = false,
     val supplierRuc: String = "",
     val supplierName: String = "",

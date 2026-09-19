@@ -10,6 +10,8 @@ import aimar.rojas.avmadmin.features.accounting.domain.InvoiceOcrScanner
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +35,7 @@ class ExpenseInvoicesViewModel @Inject constructor(
 
     private val _formState = MutableStateFlow(ScanInvoiceFormUiState())
     val formState: StateFlow<ScanInvoiceFormUiState> = _formState.asStateFlow()
+    private var ocrJob: Job? = null
 
     init {
         val currentPeriod = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
@@ -87,14 +90,16 @@ class ExpenseInvoicesViewModel @Inject constructor(
     }
 
     fun onImageScanned(imageUri: Uri) {
+        ocrJob?.cancel()
         _formState.update {
             ScanInvoiceFormUiState(
                 scannedImageUri = imageUri,
-                isOcrProcessing = true
+                isOcrProcessing = true,
+                processingStage = InvoiceProcessingStage.PREPARING_IMAGE
             )
         }
 
-        viewModelScope.launch {
+        ocrJob = viewModelScope.launch {
             var aiSuccess = false
             try {
                 val tempWebpFile = withContext(Dispatchers.IO) {
@@ -102,26 +107,14 @@ class ExpenseInvoicesViewModel @Inject constructor(
                 }
 
                 try {
+                    _formState.update {
+                        it.copy(processingStage = InvoiceProcessingStage.ANALYZING_WITH_AI)
+                    }
                     val aiResult = repository.parseInvoiceWithAi(tempWebpFile)
                     aiResult.fold(
                         onSuccess = { ocrData ->
                             aiSuccess = true
-                            _formState.update { current ->
-                                current.copy(
-                                    isOcrProcessing = false,
-                                    supplierRuc = ocrData.supplierRuc,
-                                    supplierName = ocrData.supplierName,
-                                    documentType = ocrData.documentType.ifEmpty { "FACTURA" },
-                                    series = ocrData.series,
-                                    number = ocrData.number,
-                                    issueDate = ocrData.issueDate,
-                                    subtotal = ocrData.subtotal,
-                                    taxAmount = ocrData.taxAmount,
-                                    totalAmount = ocrData.totalAmount,
-                                    category = ocrData.category.ifEmpty { current.category },
-                                    description = ocrData.description.ifEmpty { current.description }
-                                )
-                            }
+                            applyExtractedData(ocrData, InvoiceExtractionSource.AI)
                         },
                         onFailure = {
                             aiSuccess = false
@@ -130,6 +123,8 @@ class ExpenseInvoicesViewModel @Inject constructor(
                 } finally {
                     tempWebpFile.delete()
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 aiSuccess = false
             }
@@ -137,28 +132,30 @@ class ExpenseInvoicesViewModel @Inject constructor(
             // Fallback a OCR local (ML Kit) si la IA remota no responde o falla
             if (!aiSuccess) {
                 try {
+                    _formState.update {
+                        it.copy(processingStage = InvoiceProcessingStage.USING_LOCAL_OCR)
+                    }
                     val localOcrData = withContext(Dispatchers.IO) {
                         ocrScanner.processImage(context, imageUri)
                     }
 
-                    _formState.update { current ->
-                        current.copy(
-                            isOcrProcessing = false,
-                            supplierRuc = localOcrData.supplierRuc,
-                            supplierName = localOcrData.supplierName,
-                            documentType = localOcrData.documentType.ifEmpty { "FACTURA" },
-                            series = localOcrData.series,
-                            number = localOcrData.number,
-                            issueDate = localOcrData.issueDate,
-                            subtotal = localOcrData.subtotal,
-                            taxAmount = localOcrData.taxAmount,
-                            totalAmount = localOcrData.totalAmount
-                        )
-                    }
+                    applyExtractedData(localOcrData, InvoiceExtractionSource.LOCAL_OCR)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     _formState.update {
                         it.copy(
                             isOcrProcessing = false,
+                            processingStage = InvoiceProcessingStage.COMPLETED,
+                            supplierRuc = it.supplierRuc.orDash(),
+                            supplierName = it.supplierName.orDash(),
+                            series = it.series.orDash(),
+                            number = it.number.orDash(),
+                            issueDate = it.issueDate.ifBlank { currentDateInPeruvianFormat() },
+                            subtotal = it.subtotal.ifBlank { "0.00" },
+                            taxAmount = it.taxAmount.ifBlank { "0.00" },
+                            category = it.category.ifBlank { "OTROS" },
+                            description = it.description.orDash(),
                             errorMessage = "No se pudo leer el comprobante automáticamente. Puedes ingresar los datos manualmente."
                         )
                     }
@@ -205,8 +202,16 @@ class ExpenseInvoicesViewModel @Inject constructor(
         _formState.value = ScanInvoiceFormUiState()
     }
 
+    fun cancelOcrProcessing() {
+        ocrJob?.cancel()
+        ocrJob = null
+        resetForm()
+    }
+
     fun submitInvoice(onSuccess: () -> Unit) {
         val state = _formState.value
+        if (state.isOcrProcessing) return
+
         val uri = state.scannedImageUri
 
         if (uri == null) {
@@ -317,5 +322,52 @@ class ExpenseInvoicesViewModel @Inject constructor(
             return "${ymdParts[0]}-${ymdParts[1].padStart(2, '0')}"
         }
         return null
+    }
+
+    private fun applyExtractedData(
+        ocrData: aimar.rojas.avmadmin.features.accounting.domain.model.InvoiceOcrData,
+        source: InvoiceExtractionSource
+    ) {
+        _formState.update { current ->
+            current.copy(
+                isOcrProcessing = false,
+                processingStage = InvoiceProcessingStage.COMPLETED,
+                extractionSource = source,
+                supplierRuc = ocrData.supplierRuc.orDash(),
+                supplierName = ocrData.supplierName.orDash(),
+                documentType = ocrData.documentType.ifBlank { "FACTURA" },
+                series = ocrData.series.orDash(),
+                number = ocrData.number.orDash(),
+                issueDate = ocrData.issueDate.ifBlank { currentDateInPeruvianFormat() },
+                subtotal = ocrData.subtotal.ifBlank { "0.00" },
+                taxAmount = ocrData.taxAmount.ifBlank { "0.00" },
+                totalAmount = ocrData.totalAmount,
+                category = ocrData.category.normalizedCategory(),
+                description = ocrData.description.orDash()
+            )
+        }
+    }
+
+    private fun String.orDash(): String = trim().ifBlank { "-" }
+
+    private fun String.normalizedCategory(): String {
+        val category = trim().uppercase()
+        return category.takeIf { it in expenseInvoiceCategories } ?: "OTROS"
+    }
+
+    private fun currentDateInPeruvianFormat(): String =
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+
+    private companion object {
+        val expenseInvoiceCategories = setOf(
+            "COMBUSTIBLE",
+            "FLETE",
+            "HERRAMIENTAS",
+            "FERTILIZANTES",
+            "MANTENIMIENTO",
+            "SERVICIOS",
+            "VIATICOS",
+            "OTROS"
+        )
     }
 }

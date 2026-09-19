@@ -1,7 +1,11 @@
 package aimar.rojas.avmadmin.features.accounting.presentation
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -67,6 +71,25 @@ fun ScanExpenseInvoiceScreen(
     viewModel: ExpenseInvoicesViewModel
 ) {
     val formState by viewModel.formState.collectAsState()
+
+    if (formState.isOcrProcessing) {
+        BackHandler {
+            viewModel.cancelOcrProcessing()
+            navController.popBackStack()
+        }
+        InvoiceProcessingScreen(
+            imageUri = formState.scannedImageUri,
+            processingStage = formState.processingStage,
+            onBack = {
+                viewModel.cancelOcrProcessing()
+                navController.popBackStack()
+            }
+        )
+        return
+    }
+
+    val hasValidTotal = (formState.totalAmount.toDoubleOrNull() ?: 0.0) > 0.0
+    val canSubmit = formState.scannedImageUri != null && hasValidTotal && !formState.isSubmitting
     var showFullscreenImage by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
@@ -254,13 +277,14 @@ fun ScanExpenseInvoiceScreen(
                         )
 
                         AvmPrimaryButton(
-                            text = "Guardar Factura",
+                            text = if (hasValidTotal) "Guardar Factura" else "Ingresa el importe total",
                             onClick = {
                                 viewModel.submitInvoice {
                                     navController.popBackStack()
                                 }
                             },
                             modifier = Modifier.weight(1.6f),
+                            enabled = canSubmit,
                             isLoading = formState.isSubmitting,
                             loadingText = "Guardando...",
                             leadingIcon = Icons.Default.Save
@@ -341,32 +365,7 @@ fun ScanExpenseInvoiceScreen(
                         }
                     }
 
-                    // Estado OCR / IA
-                    if (formState.isOcrProcessing) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 2.dp
-                            )
-                            Text(
-                                text = "Analizando comprobante con IA...",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    } else if (formState.supplierRuc.isNotEmpty() || formState.totalAmount.isNotEmpty()) {
+                    if (formState.supplierRuc.isNotEmpty() || formState.totalAmount.isNotEmpty()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -385,7 +384,10 @@ fun ScanExpenseInvoiceScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = "Datos extraídos con IA. Revisa y confirma.",
+                                text = when (formState.extractionSource) {
+                                    InvoiceExtractionSource.LOCAL_OCR -> "Datos leídos en el dispositivo. Revisa y confirma."
+                                    else -> "Datos extraídos con IA. Revisa y confirma."
+                                },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 fontWeight = FontWeight.Medium
@@ -821,6 +823,126 @@ fun ScanExpenseInvoiceScreen(
             }
 
             Spacer(modifier = Modifier.height(28.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InvoiceProcessingScreen(
+    imageUri: Uri?,
+    processingStage: InvoiceProcessingStage,
+    onBack: () -> Unit
+) {
+    val (title, detail) = when (processingStage) {
+        InvoiceProcessingStage.PREPARING_IMAGE -> "Preparando comprobante" to
+            "Optimizando la imagen para leerla con precisión."
+        InvoiceProcessingStage.ANALYZING_WITH_AI -> "Leyendo los datos" to
+            "Estamos identificando proveedor, importes y tipo de documento."
+        InvoiceProcessingStage.USING_LOCAL_OCR -> "Leyendo en este dispositivo" to
+            "La lectura automática continúa sin conexión al servicio remoto."
+        else -> "Preparando comprobante" to "Un momento, por favor."
+    }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { Text("Preparar comprobante", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Atrás"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        }
+    ) { paddingValues ->
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                AnimatedVisibility(
+                    visible = imageUri != null,
+                    enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 280.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color.Black,
+                        shadowElevation = 6.dp
+                    ) {
+                        AsyncImage(
+                            model = imageUri,
+                            contentDescription = "Comprobante capturado",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 3.dp
+                        )
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = detail,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.16f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Te llevaremos a la revisión cuando terminemos.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
         }
     }
 }
