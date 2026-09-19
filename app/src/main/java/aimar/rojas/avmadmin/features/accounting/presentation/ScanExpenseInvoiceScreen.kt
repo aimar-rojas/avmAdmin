@@ -26,8 +26,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 import aimar.rojas.avmadmin.ui.components.AvmSecondaryButton
@@ -74,47 +72,78 @@ fun ScanExpenseInvoiceScreen(
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
     var docTypeDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Diálogo de Fecha Nativo en formato estándar peruano DD/MM/YYYY
+    // Bottom Sheet de Selector de Fecha en formato estándar peruano DD/MM/YYYY
     if (showDatePicker) {
+        val dateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = System.currentTimeMillis()
         )
-        DatePickerDialog(
+        ModalBottomSheet(
             onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                        val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-                            timeInMillis = millis
-                        }
-                        viewModel.updateIssueDate(sdf.format(utcCal.time))
+            sheetState = dateSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                DatePicker(
+                    state = datePickerState,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = { showDatePicker = false }) {
+                        Text("Cancelar")
                     }
-                    showDatePicker = false
-                }) {
-                    Text("Aceptar", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancelar")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            datePickerState.selectedDateMillis?.let { millis ->
+                                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                                val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                                    timeInMillis = millis
+                                }
+                                viewModel.updateIssueDate(sdf.format(utcCal.time))
+                            }
+                            showDatePicker = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("Aceptar", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
-        ) {
-            DatePicker(state = datePickerState)
         }
     }
 
-    // Modal de Imagen a Pantalla Completa (Inspección en Alta Resolución)
+    // Bottom Sheet de Imagen en Alta Resolución (Inspección)
     if (showFullscreenImage && formState.scannedImageUri != null) {
-        Dialog(
+        val imageSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
             onDismissRequest = { showFullscreenImage = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
+            sheetState = imageSheetState,
+            containerColor = Color.Black,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.95f))
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.92f)
+                    .background(Color.Black)
             ) {
                 AsyncImage(
                     model = formState.scannedImageUri,
@@ -128,8 +157,9 @@ fun ScanExpenseInvoiceScreen(
                 IconButton(
                     onClick = { showFullscreenImage = false },
                     modifier = Modifier
+                        .statusBarsPadding()
                         .align(Alignment.TopEnd)
-                        .padding(24.dp)
+                        .padding(16.dp)
                         .background(Color.Black.copy(alpha = 0.6f), CircleShape)
                 ) {
                     Icon(

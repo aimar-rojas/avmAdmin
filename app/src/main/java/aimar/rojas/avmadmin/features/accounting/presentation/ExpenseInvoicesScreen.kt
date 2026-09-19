@@ -28,8 +28,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import aimar.rojas.avmadmin.features.accounting.domain.model.ExpenseInvoice
@@ -66,35 +64,61 @@ fun ExpenseInvoicesScreen(
     var invoiceToDelete by remember { mutableStateOf<ExpenseInvoice?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Diálogo de confirmación para eliminar comprobante
+    // Bottom Sheet de confirmación para eliminar comprobante
     if (invoiceToDelete != null) {
         val invoice = invoiceToDelete!!
-        AlertDialog(
+        val deleteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
             onDismissRequest = { invoiceToDelete = null },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(32.dp)
-                )
-            },
-            title = {
+            sheetState = deleteSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = CircleShape,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+
                 Text(
                     text = "Eliminar comprobante",
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
-            },
-            text = {
+
                 val name = invoice.supplierName.ifEmpty { "este comprobante" }
                 val seriesNumber = if (invoice.series.isNotEmpty() || invoice.number.isNotEmpty()) {
                     " (${invoice.series}-${invoice.number})"
                 } else ""
+
                 Text(
-                    text = "¿Deseas eliminar el comprobante de $name$seriesNumber por S/ ${String.format(Locale.US, "%.2f", invoice.totalAmount)}? Esta acción no se puede deshacer."
+                    text = "¿Estás seguro de eliminar el comprobante de $name$seriesNumber por S/ ${String.format(Locale.US, "%.2f", invoice.totalAmount)}? Esta acción eliminará el registro y la imagen de forma permanente.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
-            },
-            confirmButton = {
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Button(
                     onClick = {
                         val id = invoice.id
@@ -102,20 +126,31 @@ fun ExpenseInvoicesScreen(
                         inspectingInvoice = null
                         viewModel.deleteInvoice(id.toLong())
                     },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
-                    )
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Eliminar", fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Eliminar comprobante", fontWeight = FontWeight.Bold)
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { invoiceToDelete = null }) {
-                    Text("Cancelar")
+
+                OutlinedButton(
+                    onClick = { invoiceToDelete = null },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Cancelar", fontWeight = FontWeight.SemiBold)
                 }
             }
-        )
+        }
     }
 
     // Bottom Sheet de Inspección de Comprobante
@@ -142,7 +177,7 @@ fun ExpenseInvoicesScreen(
 
     // Modal de pantalla completa para ver la foto con zoom interactivo
     if (fullscreenPhotoUrl != null) {
-        FullscreenPhotoViewer(
+        FullscreenPhotoViewerSheet(
             photoUrl = fullscreenPhotoUrl!!,
             onDismiss = { fullscreenPhotoUrl = null }
         )
@@ -1052,21 +1087,26 @@ fun InvoiceDetailSheetContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FullscreenPhotoViewer(
+fun FullscreenPhotoViewerSheet(
     photoUrl: String,
     onDismiss: () -> Unit
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        sheetState = sheetState,
+        containerColor = Color.Black,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f)
                 .background(Color.Black)
         ) {
             SubcomposeAsyncImage(
