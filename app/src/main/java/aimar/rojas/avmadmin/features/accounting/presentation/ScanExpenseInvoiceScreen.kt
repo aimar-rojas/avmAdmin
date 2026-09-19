@@ -2,9 +2,11 @@ package aimar.rojas.avmadmin.features.accounting.presentation
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -193,6 +196,16 @@ fun ScanExpenseInvoiceScreen(
                 }
             }
         }
+    }
+
+    if (formState.showDuplicateInvoiceSheet) {
+        DuplicateInvoiceSheet(
+            onReview = viewModel::dismissDuplicateInvoiceSheet,
+            onBackToInvoices = {
+                viewModel.resetForm()
+                navController.popBackStack()
+            }
+        )
     }
 
     Scaffold(
@@ -829,120 +842,303 @@ fun ScanExpenseInvoiceScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun DuplicateInvoiceSheet(
+    onReview: () -> Unit,
+    onBackToInvoices: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onReview,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.size(52.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(14.dp)
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Este comprobante ya está registrado",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "No guardamos una segunda copia para evitar duplicar el gasto. Puedes revisar los datos si se trata de otro comprobante.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            AvmPrimaryButton(
+                text = "Revisar datos",
+                onClick = onReview,
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = Icons.Default.Edit
+            )
+            TextButton(
+                onClick = onBackToInvoices,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            ) {
+                Text("Volver a facturas")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun InvoiceProcessingScreen(
     imageUri: Uri?,
     processingStage: InvoiceProcessingStage,
     onBack: () -> Unit
 ) {
     val (title, detail) = when (processingStage) {
-        InvoiceProcessingStage.PREPARING_IMAGE -> "Preparando comprobante" to
-            "Optimizando la imagen para leerla con precisión."
-        InvoiceProcessingStage.ANALYZING_WITH_AI -> "Leyendo los datos" to
-            "Estamos identificando proveedor, importes y tipo de documento."
-        InvoiceProcessingStage.USING_LOCAL_OCR -> "Leyendo en este dispositivo" to
-            "La lectura automática continúa sin conexión al servicio remoto."
-        else -> "Preparando comprobante" to "Un momento, por favor."
+        InvoiceProcessingStage.PREPARING_IMAGE -> "Preparando la evidencia" to
+            "Ajustamos la imagen para conservar cada dato del comprobante."
+        InvoiceProcessingStage.ANALYZING_WITH_AI -> "Convirtiendo imagen en registro" to
+            "Identificamos emisor, importes y categoría del gasto."
+        InvoiceProcessingStage.USING_LOCAL_OCR -> "Terminando la lectura en tu dispositivo" to
+            "Continuamos con el reconocimiento local para que puedas revisar el registro."
+        else -> "Preparando la evidencia" to "Un momento, por favor."
     }
+    val activeStep = when (processingStage) {
+        InvoiceProcessingStage.PREPARING_IMAGE -> 0
+        InvoiceProcessingStage.ANALYZING_WITH_AI,
+        InvoiceProcessingStage.USING_LOCAL_OCR -> 1
+        else -> 0
+    }
+    val scanTransition = rememberInfiniteTransition(label = "invoiceScan")
+    val scanProgress by scanTransition.animateFloat(
+        initialValue = 0.10f,
+        targetValue = 0.90f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scanLine"
+    )
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Preparar comprobante", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Atrás"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        }
-    ) { paddingValues ->
-        Surface(
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            color = MaterialTheme.colorScheme.background
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 24.dp, vertical = 28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                AnimatedVisibility(
-                    visible = imageUri != null,
-                    enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(44.dp)
                 ) {
-                    Surface(
+                    Icon(
+                        imageVector = Icons.Default.DocumentScanner,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "Nuevo comprobante",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Lectura en curso",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 220.dp, max = 260.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 8.dp
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AsyncImage(
+                        model = imageUri,
+                        contentDescription = "Comprobante en proceso de lectura",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 280.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.Black,
-                        shadowElevation = 6.dp
+                            .height(3.dp)
+                            .align(Alignment.TopCenter)
+                            .graphicsLayer {
+                                translationY = 270.dp.toPx() * scanProgress
+                            }
+                            .background(MaterialTheme.colorScheme.secondary)
+                    )
+
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        AsyncImage(
-                            model = imageUri,
-                            contentDescription = "Comprobante capturado",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Visibility,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                            Text(
+                                text = "Comprobante capturado",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            ProcessingTimeline(activeStep = activeStep)
 
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 3.dp
-                        )
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = detail,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.16f)
-                        )
-                    }
-                }
+            Spacer(modifier = Modifier.weight(1f))
+            TextButton(onClick = onBack) {
+                Text("Cancelar lectura")
+            }
+        }
+    }
+}
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Te llevaremos a la revisión cuando terminemos.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+@Composable
+private fun ProcessingTimeline(activeStep: Int) {
+    val steps = listOf("Imagen", "Lectura", "Revisión")
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        steps.forEachIndexed { index, label ->
+            ProcessingTimelineStep(
+                label = label,
+                isActive = index == activeStep,
+                isComplete = index < activeStep
+            )
+            if (index < steps.lastIndex) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(top = 11.dp)
+                        .height(1.dp)
+                        .background(
+                            if (index < activeStep) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.outlineVariant
+                        )
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ProcessingTimelineStep(
+    label: String,
+    isActive: Boolean,
+    isComplete: Boolean
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Surface(
+            modifier = Modifier
+                .size(22.dp)
+                .then(
+                    if (!isActive && !isComplete) {
+                        Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    } else {
+                        Modifier
+                    }
+                ),
+            shape = CircleShape,
+            color = when {
+                isActive -> MaterialTheme.colorScheme.primary
+                isComplete -> MaterialTheme.colorScheme.secondary
+                else -> MaterialTheme.colorScheme.surface
+            }
+        ) {
+            if (isComplete) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.padding(4.dp),
+                    tint = MaterialTheme.colorScheme.onSecondary
+                )
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

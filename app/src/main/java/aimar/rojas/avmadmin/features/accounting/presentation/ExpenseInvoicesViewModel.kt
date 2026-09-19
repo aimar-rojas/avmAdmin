@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import aimar.rojas.avmadmin.features.accounting.data.ImageUtils
+import aimar.rojas.avmadmin.features.accounting.domain.DuplicateExpenseInvoiceException
 import aimar.rojas.avmadmin.features.accounting.domain.ExpenseInvoicesRepository
 import aimar.rojas.avmadmin.features.accounting.domain.InvoiceOcrScanner
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -225,7 +226,13 @@ class ExpenseInvoicesViewModel @Inject constructor(
             return
         }
 
-        _formState.update { it.copy(isSubmitting = true, errorMessage = null) }
+        _formState.update {
+            it.copy(
+                isSubmitting = true,
+                errorMessage = null,
+                showDuplicateInvoiceSheet = false
+            )
+        }
 
         viewModelScope.launch {
             try {
@@ -269,7 +276,12 @@ class ExpenseInvoicesViewModel @Inject constructor(
                         _formState.update {
                             it.copy(
                                 isSubmitting = false,
-                                errorMessage = err.message ?: "Error al guardar comprobante"
+                                showDuplicateInvoiceSheet = err is DuplicateExpenseInvoiceException,
+                                errorMessage = if (err is DuplicateExpenseInvoiceException) {
+                                    null
+                                } else {
+                                    "No se pudo guardar el comprobante. Inténtalo nuevamente."
+                                }
                             )
                         }
                     }
@@ -278,11 +290,15 @@ class ExpenseInvoicesViewModel @Inject constructor(
                 _formState.update {
                     it.copy(
                         isSubmitting = false,
-                        errorMessage = e.message ?: "Error inesperado durante la compresión"
+                        errorMessage = "No se pudo preparar el comprobante. Inténtalo nuevamente."
                     )
                 }
             }
         }
+    }
+
+    fun dismissDuplicateInvoiceSheet() {
+        _formState.update { it.copy(showDuplicateInvoiceSheet = false) }
     }
 
     fun deleteInvoice(id: Long, onDone: () -> Unit = {}) {

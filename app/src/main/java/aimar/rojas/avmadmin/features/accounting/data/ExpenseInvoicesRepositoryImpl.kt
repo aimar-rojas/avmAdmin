@@ -1,6 +1,7 @@
 package aimar.rojas.avmadmin.features.accounting.data
 
 import aimar.rojas.avmadmin.features.accounting.domain.ExpenseInvoicesRepository
+import aimar.rojas.avmadmin.features.accounting.domain.DuplicateExpenseInvoiceException
 import aimar.rojas.avmadmin.features.accounting.domain.model.CategorySummary
 import aimar.rojas.avmadmin.features.accounting.domain.model.DocumentTypeSummary
 import aimar.rojas.avmadmin.features.accounting.domain.model.ExpenseInvoice
@@ -120,7 +121,15 @@ class ExpenseInvoicesRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body()?.invoice != null) {
                 Result.success(response.body()!!.invoice!!.toDomain())
             } else {
-                Result.failure(Exception("Error al registrar factura: ${response.code()} ${response.errorBody()?.string() ?: response.message()}"))
+                val responseError = response.errorBody()?.string().orEmpty()
+                val isDuplicate = responseError.contains("comprobante ya registrado", ignoreCase = true) ||
+                    responseError.contains("duplicad", ignoreCase = true)
+
+                if (isDuplicate) {
+                    Result.failure(DuplicateExpenseInvoiceException())
+                } else {
+                    Result.failure(Exception("No se pudo guardar el comprobante. Inténtalo nuevamente."))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)

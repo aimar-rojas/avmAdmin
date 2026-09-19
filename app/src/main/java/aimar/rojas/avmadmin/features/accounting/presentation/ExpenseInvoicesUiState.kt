@@ -45,5 +45,6 @@ data class ScanInvoiceFormUiState(
     val category: String = "OTROS",
     val description: String = "",
     val isSuccess: Boolean = false,
+    val showDuplicateInvoiceSheet: Boolean = false,
     val errorMessage: String? = null
 )
