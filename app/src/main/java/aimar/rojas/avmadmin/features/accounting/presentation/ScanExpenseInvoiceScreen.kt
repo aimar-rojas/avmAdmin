@@ -29,13 +29,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
-import aimar.rojas.avmadmin.ui.components.AvmButtonSize
 import aimar.rojas.avmadmin.ui.components.AvmPrimaryButton
 import aimar.rojas.avmadmin.ui.components.AvmSecondaryButton
 import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
@@ -76,7 +74,7 @@ fun ScanExpenseInvoiceScreen(
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
     var docTypeDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Diálogo de Fecha Nativo
+    // Diálogo de Fecha Nativo en formato estándar peruano DD/MM/YYYY
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = System.currentTimeMillis()
@@ -86,7 +84,7 @@ fun ScanExpenseInvoiceScreen(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
                         val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
                             timeInMillis = millis
                         }
@@ -107,7 +105,7 @@ fun ScanExpenseInvoiceScreen(
         }
     }
 
-    // Modal de Imagen a Pantalla Completa (Zoom / Inspección)
+    // Modal de Imagen a Pantalla Completa (Inspección en Alta Resolución)
     if (showFullscreenImage && formState.scannedImageUri != null) {
         Dialog(
             onDismissRequest = { showFullscreenImage = false },
@@ -155,7 +153,7 @@ fun ScanExpenseInvoiceScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Valida o ajusta los datos antes de guardar",
+                            text = "Verifica los datos de la compra realizada",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -191,24 +189,25 @@ fun ScanExpenseInvoiceScreen(
                     if (formState.errorMessage != null) {
                         Surface(
                             color = MaterialTheme.colorScheme.errorContainer,
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Error,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                                 Text(
                                     text = formState.errorMessage ?: "",
                                     color = MaterialTheme.colorScheme.onErrorContainer,
-                                    style = MaterialTheme.typography.bodySmall
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
                         }
@@ -246,17 +245,17 @@ fun ScanExpenseInvoiceScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // ==========================================
-            // 1. HERO PREVIEW DE LA IMAGEN + ESTADO OCR
+            // FOTO DEL COMPROBANTE & ESTADO OCR
             // ==========================================
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 )
             ) {
                 Column(
@@ -284,7 +283,7 @@ fun ScanExpenseInvoiceScreen(
 
                             // Botón de Lupa flotante
                             Surface(
-                                color = Color.Black.copy(alpha = 0.65f),
+                                color = Color.Black.copy(alpha = 0.7f),
                                 shape = RoundedCornerShape(20.dp),
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
@@ -326,12 +325,12 @@ fun ScanExpenseInvoiceScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(18.dp),
                                 color = MaterialTheme.colorScheme.primary,
                                 strokeWidth = 2.dp
                             )
                             Text(
-                                text = "Analizando texto y extrayendo montos con OCR...",
+                                text = "Extrayendo datos de la factura con OCR...",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.Medium
@@ -356,7 +355,7 @@ fun ScanExpenseInvoiceScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = "Datos detectados con OCR. Toca la foto para cotejar.",
+                                text = "Datos detectados con OCR. Revisa y confirma.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 fontWeight = FontWeight.Medium
@@ -367,10 +366,10 @@ fun ScanExpenseInvoiceScreen(
             }
 
             // ==========================================
-            // 2. SECCIÓN: DATOS DEL COMPROBANTE & PROVEEDOR
+            // 1. IDENTIFICACIÓN Y FECHA (¡PRIORIDAD ALTA!)
             // ==========================================
             Text(
-                text = "1. Comprobante y Proveedor",
+                text = "1. Comprobante y Fecha de Emisión",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -378,7 +377,7 @@ fun ScanExpenseInvoiceScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
@@ -390,7 +389,43 @@ fun ScanExpenseInvoiceScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Tipo de Comprobante (Dropdown limpio)
+                    // Fecha de Emisión Destacada (Formato Peruano DD/MM/YYYY)
+                    OutlinedTextField(
+                        value = formState.issueDate,
+                        onValueChange = { viewModel.updateIssueDate(it) },
+                        label = { Text("Fecha de Emisión (Día / Mes / Año) *") },
+                        placeholder = { Text("DD/MM/AAAA (ej. 18/09/2026)") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showDatePicker = true },
+                        singleLine = true,
+                        readOnly = true,
+                        shape = RoundedCornerShape(12.dp),
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = "Elegir fecha",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        )
+                    )
+
+                    // Tipo de Comprobante
                     ExposedDropdownMenuBox(
                         expanded = docTypeDropdownExpanded,
                         onExpandedChange = { docTypeDropdownExpanded = !docTypeDropdownExpanded }
@@ -400,11 +435,24 @@ fun ScanExpenseInvoiceScreen(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Tipo de Documento") },
+                            shape = RoundedCornerShape(12.dp),
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Description,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = docTypeDropdownExpanded) },
                             modifier = Modifier
                                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, true)
                                 .fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors()
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
                         )
 
                         ExposedDropdownMenu(
@@ -428,18 +476,25 @@ fun ScanExpenseInvoiceScreen(
                         }
                     }
 
-                    // Serie y Número en dos columnas proporcionadas
+                    // Serie y Número
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedTextField(
                             value = formState.series,
-                            onValueChange = { viewModel.updateSeries(it) },
+                            onValueChange = { viewModel.updateSeries(it.uppercase()) },
                             label = { Text("Serie") },
                             placeholder = { Text("ej. F001") },
                             modifier = Modifier.weight(1f),
-                            singleLine = true
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
                         )
                         OutlinedTextField(
                             value = formState.number,
@@ -447,7 +502,14 @@ fun ScanExpenseInvoiceScreen(
                             label = { Text("Número Correlativo") },
                             placeholder = { Text("ej. 00045231") },
                             modifier = Modifier.weight(1.6f),
-                            singleLine = true
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
                         )
                     }
 
@@ -455,44 +517,54 @@ fun ScanExpenseInvoiceScreen(
                     OutlinedTextField(
                         value = formState.supplierRuc,
                         onValueChange = { viewModel.updateRuc(it) },
-                        label = { Text("RUC del Emisor (11 dígitos)") },
+                        label = { Text("RUC del Proveedor (11 dígitos)") },
                         placeholder = { Text("ej. 20601234567") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        shape = RoundedCornerShape(12.dp),
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Badge,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        )
                     )
 
                     OutlinedTextField(
                         value = formState.supplierName,
                         onValueChange = { viewModel.updateSupplierName(it) },
-                        label = { Text("Razón Social / Proveedor") },
+                        label = { Text("Razón Social / Nombre del Proveedor") },
                         placeholder = { Text("ej. Estación de Servicios El Sol S.A.C.") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Storefront, contentDescription = null, tint = MaterialTheme.colorScheme.outline) }
-                    )
-
-                    // Fecha de Emisión con Picker
-                    OutlinedTextField(
-                        value = formState.issueDate,
-                        onValueChange = { viewModel.updateIssueDate(it) },
-                        label = { Text("Fecha de Emisión (YYYY-MM-DD)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        readOnly = true,
-                        leadingIcon = { Icon(Icons.Default.Event, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
-                        trailingIcon = {
-                            IconButton(onClick = { showDatePicker = true }) {
-                                Icon(Icons.Default.CalendarMonth, contentDescription = "Seleccionar fecha", tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
+                        shape = RoundedCornerShape(12.dp),
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Storefront,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        )
                     )
                 }
             }
 
             // ==========================================
-            // 3. SECCIÓN: CLASIFICACIÓN CONTABLE Y CATEGORÍA
+            // 2. CLASIFICACIÓN DEL GASTO
             // ==========================================
             Text(
                 text = "2. Clasificación del Gasto",
@@ -503,7 +575,7 @@ fun ScanExpenseInvoiceScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
@@ -518,7 +590,6 @@ fun ScanExpenseInvoiceScreen(
                     val currentCategoryItem = EXPENSE_CATEGORY_ITEMS.firstOrNull { it.code == formState.category }
                         ?: EXPENSE_CATEGORY_ITEMS.last()
 
-                    // Dropdown elegante de categoría con icono
                     ExposedDropdownMenuBox(
                         expanded = categoryDropdownExpanded,
                         onExpandedChange = { categoryDropdownExpanded = !categoryDropdownExpanded }
@@ -527,7 +598,8 @@ fun ScanExpenseInvoiceScreen(
                             value = currentCategoryItem.label,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Categoría de Gasto") },
+                            label = { Text("Rubro / Categoría de Gasto") },
+                            shape = RoundedCornerShape(12.dp),
                             leadingIcon = {
                                 Icon(
                                     imageVector = currentCategoryItem.icon,
@@ -538,7 +610,13 @@ fun ScanExpenseInvoiceScreen(
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryDropdownExpanded) },
                             modifier = Modifier
                                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, true)
-                                .fillMaxWidth()
+                                .fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
                         )
 
                         ExposedDropdownMenu(
@@ -568,37 +646,14 @@ fun ScanExpenseInvoiceScreen(
                             }
                         }
                     }
-
-                    // Moneda
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Moneda:",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        FilterChip(
-                            selected = formState.currency == "PEN",
-                            onClick = { viewModel.updateCurrency("PEN") },
-                            label = { Text("Soles (PEN S/)") }
-                        )
-                        FilterChip(
-                            selected = formState.currency == "USD",
-                            onClick = { viewModel.updateCurrency("USD") },
-                            label = { Text("Dólares (USD $)") }
-                        )
-                    }
                 }
             }
 
             // ==========================================
-            // 4. SECCIÓN: MONTOS E IMPUESTOS (IGV)
+            // 3. DESGLOSE DE IMPORTES (S/)
             // ==========================================
             Text(
-                text = "3. Importes y Crédito Fiscal",
+                text = "3. Desglose de Importes (S/)",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -606,7 +661,7 @@ fun ScanExpenseInvoiceScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
@@ -618,31 +673,40 @@ fun ScanExpenseInvoiceScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Total Principal
+                    // Total Pagado Destacado
                     OutlinedTextField(
                         value = formState.totalAmount,
                         onValueChange = { viewModel.updateTotalAmount(it) },
-                        label = { Text("Importe Total a Pagar *") },
+                        label = { Text("Importe Total Pagado (S/) *") },
                         placeholder = { Text("0.00") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         leadingIcon = {
-                            Text(
-                                text = if (formState.currency == "USD") "$" else "S/",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = 12.dp)
-                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Text(
+                                    text = "S/",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                         )
                     )
 
-                    // Subtotal e IGV
+                    // Subtotal e IGV en 2 columnas
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -654,32 +718,46 @@ fun ScanExpenseInvoiceScreen(
                             placeholder = { Text("0.00") },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
                         )
                         OutlinedTextField(
                             value = formState.taxAmount,
                             onValueChange = { viewModel.updateTaxAmount(it) },
-                            label = { Text("IGV 18% Crédito (S/)") },
+                            label = { Text("IGV 18% Deducible (S/)") },
                             placeholder = { Text("0.00") },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                                focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
                         )
                     }
 
                     Text(
-                        text = "💡 Al ingresar el Total, el Subtotal e IGV se calculan automáticamente si es Factura.",
+                        text = "💡 Al ingresar el Total Pagado, la Base Imponible y el IGV (18%) se calculan automáticamente si es Factura.",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
             // ==========================================
-            // 5. SECCIÓN: OBSERVACIONES / NOTAS
+            // 4. OBSERVACIONES (OPCIONAL)
             // ==========================================
             Text(
-                text = "4. Observaciones (Opcional)",
+                text = "4. Observaciones o Concepto (Opcional)",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -687,7 +765,7 @@ fun ScanExpenseInvoiceScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
@@ -696,16 +774,23 @@ fun ScanExpenseInvoiceScreen(
                 OutlinedTextField(
                     value = formState.description,
                     onValueChange = { viewModel.updateDescription(it) },
-                    placeholder = { Text("Escribe notas adicionales sobre este gasto para el contador...") },
+                    placeholder = { Text("Detalles adicionales del gasto para el contador...") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     minLines = 3,
-                    maxLines = 5
+                    maxLines = 5,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
                 )
             }
 
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(28.dp))
         }
     }
 }

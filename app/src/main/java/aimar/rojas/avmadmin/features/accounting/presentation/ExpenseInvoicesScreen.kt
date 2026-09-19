@@ -429,7 +429,7 @@ fun InvoiceItemCard(invoice: ExpenseInvoice) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = invoice.issueDate.take(10),
+                        text = formatDisplayDatePe(invoice.issueDate),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -482,4 +482,20 @@ fun InvoiceItemCard(invoice: ExpenseInvoice) {
             }
         }
     }
+}
+
+private fun formatDisplayDatePe(dateStr: String): String {
+    if (dateStr.isBlank()) return "-"
+    if (dateStr.contains("/")) {
+        val parts = dateStr.split("/")
+        if (parts.size == 3) {
+            return "${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}"
+        }
+    }
+    val clean = dateStr.take(10)
+    val parts = clean.split("-")
+    if (parts.size == 3 && parts[0].length == 4) {
+        return "${parts[2]}/${parts[1]}/${parts[0]}"
+    }
+    return dateStr
 }

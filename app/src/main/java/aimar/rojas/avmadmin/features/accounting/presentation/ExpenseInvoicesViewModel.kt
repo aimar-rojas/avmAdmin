@@ -189,6 +189,7 @@ class ExpenseInvoicesViewModel @Inject constructor(
 
                 val subtotal = state.subtotal.toDoubleOrNull()
                 val taxAmount = state.taxAmount.toDoubleOrNull()
+                val period = extractPeriodFromDate(state.issueDate)
 
                 // 2. Enviar a backend
                 val result = repository.createInvoice(
@@ -202,8 +203,8 @@ class ExpenseInvoicesViewModel @Inject constructor(
                     supplierRuc = state.supplierRuc.ifEmpty { null },
                     supplierName = state.supplierName.ifEmpty { null },
                     issueDate = state.issueDate.ifEmpty { null },
-                    accountingPeriod = state.issueDate.takeIf { it.length >= 7 }?.substring(0, 7),
-                    currency = state.currency,
+                    accountingPeriod = period,
+                    currency = "PEN",
                     category = state.category,
                     description = state.description.ifEmpty { null }
                 )
@@ -235,5 +236,22 @@ class ExpenseInvoicesViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun extractPeriodFromDate(dateStr: String): String? {
+        if (dateStr.isBlank()) return null
+        val dmyParts = dateStr.split("/")
+        if (dmyParts.size == 3) {
+            val month = dmyParts[1].padStart(2, '0')
+            val year = dmyParts[2]
+            if (year.length == 4 && month.length == 2) {
+                return "$year-$month"
+            }
+        }
+        val ymdParts = dateStr.split("-")
+        if (ymdParts.size == 3 && ymdParts[0].length == 4) {
+            return "${ymdParts[0]}-${ymdParts[1].padStart(2, '0')}"
+        }
+        return null
     }
 }

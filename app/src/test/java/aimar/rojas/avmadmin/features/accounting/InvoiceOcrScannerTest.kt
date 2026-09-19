@@ -31,7 +31,7 @@ class InvoiceOcrScannerTest {
         assertEquals("F001", parsed.series)
         assertEquals("00045231", parsed.number)
         assertEquals("FACTURA", parsed.documentType)
-        assertEquals("2026-09-18", parsed.issueDate)
+        assertEquals("18/09/2026", parsed.issueDate)
         assertEquals("118.00", parsed.totalAmount)
         assertEquals("100.00", parsed.subtotal)
         assertEquals("18.00", parsed.taxAmount)

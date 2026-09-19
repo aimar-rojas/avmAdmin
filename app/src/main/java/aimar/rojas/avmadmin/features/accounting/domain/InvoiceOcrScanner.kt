@@ -93,28 +93,55 @@ class InvoiceOcrScanner {
             docType = "TICKET"
         }
 
-        // 3. Fecha de Emisión (DD/MM/YYYY o YYYY-MM-DD)
-        val datePattern1 = Pattern.compile("""\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b""")
-        val datePattern2 = Pattern.compile("""\b(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})\b""")
+        // 3. Fecha de Emisión (Prioridad Alta: Formato Peruano DD/MM/YYYY)
+        val datePatternDDMMYYYY = Pattern.compile("""\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b""")
+        val datePatternYYYYMMDD = Pattern.compile("""\b(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})\b""")
 
-        val dMatcher1 = datePattern1.matcher(fullText)
-        if (dMatcher1.find()) {
-            val day = dMatcher1.group(1)?.padStart(2, '0')
-            val month = dMatcher1.group(2)?.padStart(2, '0')
-            val year = dMatcher1.group(3)
-            date = "$year-$month-$day"
-        } else {
-            val dMatcher2 = datePattern2.matcher(fullText)
-            if (dMatcher2.find()) {
-                val year = dMatcher2.group(1)
-                val month = dMatcher2.group(2)?.padStart(2, '0')
-                val day = dMatcher2.group(3)?.padStart(2, '0')
-                date = "$year-$month-$day"
+        // Búsqueda prioritaria: buscar primero en líneas que contengan palabras clave de emisión
+        for (line in lines) {
+            val upper = line.uppercase()
+            if (upper.contains("EMISION") || upper.contains("EMISIÓN") || upper.contains("FECHA") || upper.contains("FEC.")) {
+                val dMatch1 = datePatternDDMMYYYY.matcher(line)
+                if (dMatch1.find()) {
+                    val day = dMatch1.group(1)?.padStart(2, '0')
+                    val month = dMatch1.group(2)?.padStart(2, '0')
+                    val year = dMatch1.group(3)
+                    date = "$day/$month/$year"
+                    break
+                }
+                val dMatch2 = datePatternYYYYMMDD.matcher(line)
+                if (dMatch2.find()) {
+                    val year = dMatch2.group(1)
+                    val month = dMatch2.group(2)?.padStart(2, '0')
+                    val day = dMatch2.group(3)?.padStart(2, '0')
+                    date = "$day/$month/$year"
+                    break
+                }
             }
         }
 
+        // Si no se encontró en líneas con palabras clave, buscar en todo el texto
         if (date.isEmpty()) {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val dMatcher1 = datePatternDDMMYYYY.matcher(fullText)
+            if (dMatcher1.find()) {
+                val day = dMatcher1.group(1)?.padStart(2, '0')
+                val month = dMatcher1.group(2)?.padStart(2, '0')
+                val year = dMatcher1.group(3)
+                date = "$day/$month/$year"
+            } else {
+                val dMatcher2 = datePatternYYYYMMDD.matcher(fullText)
+                if (dMatcher2.find()) {
+                    val year = dMatcher2.group(1)
+                    val month = dMatcher2.group(2)?.padStart(2, '0')
+                    val day = dMatcher2.group(3)?.padStart(2, '0')
+                    date = "$day/$month/$year"
+                }
+            }
+        }
+
+        // Si aún está vacía, colocar la fecha actual en formato peruano DD/MM/YYYY
+        if (date.isEmpty()) {
+            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
             date = sdf.format(java.util.Date())
         }
 
