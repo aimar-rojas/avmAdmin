@@ -341,7 +341,7 @@ fun ScanExpenseInvoiceScreen(
                         }
                     }
 
-                    // Estado OCR
+                    // Estado OCR / IA
                     if (formState.isOcrProcessing) {
                         Row(
                             modifier = Modifier
@@ -360,7 +360,7 @@ fun ScanExpenseInvoiceScreen(
                                 strokeWidth = 2.dp
                             )
                             Text(
-                                text = "Extrayendo datos de la factura con OCR...",
+                                text = "Analizando comprobante con IA...",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.Medium
@@ -385,7 +385,7 @@ fun ScanExpenseInvoiceScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = "Datos detectados con OCR. Revisa y confirma.",
+                                text = "Datos extraídos con IA. Revisa y confirma.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 fontWeight = FontWeight.Medium

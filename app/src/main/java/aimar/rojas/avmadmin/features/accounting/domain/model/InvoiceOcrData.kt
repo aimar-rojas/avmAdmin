@@ -10,5 +10,8 @@ data class InvoiceOcrData(
     val subtotal: String = "",
     val taxAmount: String = "",
     val totalAmount: String = "",
-    val rawText: String = ""
+    val category: String = "",
+    val description: String = "",
+    val rawText: String = "",
+    val isAiExtracted: Boolean = false
 )

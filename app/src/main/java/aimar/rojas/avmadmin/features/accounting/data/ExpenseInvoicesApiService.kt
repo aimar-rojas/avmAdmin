@@ -49,4 +49,32 @@ interface ExpenseInvoicesApiService {
     suspend fun deleteInvoice(
         @retrofit2.http.Path("id") id: Long
     ): Response<Map<String, Any>>
+
+    @Multipart
+    @POST("v1/expense-invoices/parse-ai")
+    suspend fun parseInvoiceWithAi(
+        @Part file: MultipartBody.Part
+    ): Response<ParsedInvoiceAiResponseDto>
 }
+
+data class ParsedInvoiceAiResponseDto(
+    val message: String? = null,
+    val data: ParsedInvoiceAiDataDto? = null
+)
+
+data class ParsedInvoiceAiDataDto(
+    val document_type: String? = null,
+    val series: String? = null,
+    val number: String? = null,
+    val supplier_ruc: String? = null,
+    val supplier_name: String? = null,
+    val issue_date: String? = null,
+    val accounting_period: String? = null,
+    val currency: String? = null,
+    val subtotal: Double? = null,
+    val tax_amount: Double? = null,
+    val total_amount: Double? = null,
+    val category: String? = null,
+    val description: String? = null,
+    val confidence: Double? = null
+)

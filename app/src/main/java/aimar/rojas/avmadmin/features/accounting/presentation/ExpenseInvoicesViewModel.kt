@@ -95,31 +95,73 @@ class ExpenseInvoicesViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            var aiSuccess = false
             try {
-                val ocrData = withContext(Dispatchers.IO) {
-                    ocrScanner.processImage(context, imageUri)
+                val tempWebpFile = withContext(Dispatchers.IO) {
+                    ImageUtils.compressAndSaveToWebp(context, imageUri)
                 }
 
-                _formState.update {
-                    it.copy(
-                        isOcrProcessing = false,
-                        supplierRuc = ocrData.supplierRuc,
-                        supplierName = ocrData.supplierName,
-                        documentType = ocrData.documentType,
-                        series = ocrData.series,
-                        number = ocrData.number,
-                        issueDate = ocrData.issueDate,
-                        subtotal = ocrData.subtotal,
-                        taxAmount = ocrData.taxAmount,
-                        totalAmount = ocrData.totalAmount
+                try {
+                    val aiResult = repository.parseInvoiceWithAi(tempWebpFile)
+                    aiResult.fold(
+                        onSuccess = { ocrData ->
+                            aiSuccess = true
+                            _formState.update { current ->
+                                current.copy(
+                                    isOcrProcessing = false,
+                                    supplierRuc = ocrData.supplierRuc,
+                                    supplierName = ocrData.supplierName,
+                                    documentType = ocrData.documentType.ifEmpty { "FACTURA" },
+                                    series = ocrData.series,
+                                    number = ocrData.number,
+                                    issueDate = ocrData.issueDate,
+                                    subtotal = ocrData.subtotal,
+                                    taxAmount = ocrData.taxAmount,
+                                    totalAmount = ocrData.totalAmount,
+                                    category = ocrData.category.ifEmpty { current.category },
+                                    description = ocrData.description.ifEmpty { current.description }
+                                )
+                            }
+                        },
+                        onFailure = {
+                            aiSuccess = false
+                        }
                     )
+                } finally {
+                    tempWebpFile.delete()
                 }
             } catch (e: Exception) {
-                _formState.update {
-                    it.copy(
-                        isOcrProcessing = false,
-                        errorMessage = "No se pudo leer el texto automáticamente. Puedes ingresar los datos manualmente."
-                    )
+                aiSuccess = false
+            }
+
+            // Fallback a OCR local (ML Kit) si la IA remota no responde o falla
+            if (!aiSuccess) {
+                try {
+                    val localOcrData = withContext(Dispatchers.IO) {
+                        ocrScanner.processImage(context, imageUri)
+                    }
+
+                    _formState.update { current ->
+                        current.copy(
+                            isOcrProcessing = false,
+                            supplierRuc = localOcrData.supplierRuc,
+                            supplierName = localOcrData.supplierName,
+                            documentType = localOcrData.documentType.ifEmpty { "FACTURA" },
+                            series = localOcrData.series,
+                            number = localOcrData.number,
+                            issueDate = localOcrData.issueDate,
+                            subtotal = localOcrData.subtotal,
+                            taxAmount = localOcrData.taxAmount,
+                            totalAmount = localOcrData.totalAmount
+                        )
+                    }
+                } catch (e: Exception) {
+                    _formState.update {
+                        it.copy(
+                            isOcrProcessing = false,
+                            errorMessage = "No se pudo leer el comprobante automáticamente. Puedes ingresar los datos manualmente."
+                        )
+                    }
                 }
             }
         }

@@ -33,4 +33,6 @@ interface ExpenseInvoicesRepository {
     ): Result<ExpenseInvoice>
 
     suspend fun deleteInvoice(id: Long): Result<Unit>
+
+    suspend fun parseInvoiceWithAi(file: File): Result<aimar.rojas.avmadmin.features.accounting.domain.model.InvoiceOcrData>
 }

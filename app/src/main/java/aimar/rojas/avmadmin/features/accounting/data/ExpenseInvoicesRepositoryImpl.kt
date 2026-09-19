@@ -140,6 +140,38 @@ class ExpenseInvoicesRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun parseInvoiceWithAi(file: File): Result<aimar.rojas.avmadmin.features.accounting.domain.model.InvoiceOcrData> {
+        return try {
+            val imageMediaType = "image/webp".toMediaTypeOrNull()
+            val fileRequestBody = file.asRequestBody(imageMediaType)
+            val filePart = MultipartBody.Part.createFormData("file", file.name, fileRequestBody)
+
+            val response = apiService.parseInvoiceWithAi(filePart)
+            if (response.isSuccessful && response.body()?.data != null) {
+                val d = response.body()!!.data!!
+                val ocrData = aimar.rojas.avmadmin.features.accounting.domain.model.InvoiceOcrData(
+                    supplierRuc = d.supplier_ruc.orEmpty(),
+                    supplierName = d.supplier_name.orEmpty(),
+                    documentType = d.document_type ?: "FACTURA",
+                    series = d.series.orEmpty(),
+                    number = d.number.orEmpty(),
+                    issueDate = d.issue_date.orEmpty(),
+                    subtotal = if (d.subtotal != null) String.format(java.util.Locale.US, "%.2f", d.subtotal) else "",
+                    taxAmount = if (d.tax_amount != null) String.format(java.util.Locale.US, "%.2f", d.tax_amount) else "",
+                    totalAmount = if (d.total_amount != null) String.format(java.util.Locale.US, "%.2f", d.total_amount) else "",
+                    category = d.category.orEmpty(),
+                    description = d.description.orEmpty(),
+                    isAiExtracted = true
+                )
+                Result.success(ocrData)
+            } else {
+                Result.failure(Exception("Error al analizar con IA: ${response.code()} ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private fun ExpenseInvoiceDto.toDomain(): ExpenseInvoice {
         val rawUrl = fileUrl.orEmpty()
         val fullUrl = when {

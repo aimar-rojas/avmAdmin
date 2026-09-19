@@ -20,6 +20,12 @@ import aimar.rojas.avmadmin.features.workers.presentation.WorkersScreen
 import aimar.rojas.avmadmin.features.accounting.presentation.ExpenseInvoicesScreen
 import aimar.rojas.avmadmin.features.accounting.presentation.ExpenseInvoicesViewModel
 import aimar.rojas.avmadmin.features.accounting.presentation.ScanExpenseInvoiceScreen
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
@@ -109,7 +115,30 @@ fun NavGraph(
             ExpenseInvoicesScreen(navController = navController, viewModel = viewModel)
         }
 
-        composable("scan_expense_invoice") { backStackEntry ->
+        composable(
+            route = "scan_expense_invoice",
+            enterTransition = {
+                slideInVertically(
+                    initialOffsetY = { it / 4 },
+                    animationSpec = tween(350, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(350))
+            },
+            exitTransition = {
+                slideOutVertically(
+                    targetOffsetY = { it / 4 },
+                    animationSpec = tween(250, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(250))
+            },
+            popEnterTransition = {
+                fadeIn(animationSpec = tween(250))
+            },
+            popExitTransition = {
+                slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(250))
+            }
+        ) { backStackEntry ->
             val parentEntry = remember(backStackEntry) {
                 navController.getBackStackEntry("expense_invoices")
             }
