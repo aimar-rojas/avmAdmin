@@ -127,6 +127,19 @@ class ExpenseInvoicesRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteInvoice(id: Long): Result<Unit> {
+        return try {
+            val response = apiService.deleteInvoice(id)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Error al eliminar factura: ${response.code()} ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private fun ExpenseInvoiceDto.toDomain(): ExpenseInvoice {
         val rawUrl = fileUrl.orEmpty()
         val fullUrl = when {

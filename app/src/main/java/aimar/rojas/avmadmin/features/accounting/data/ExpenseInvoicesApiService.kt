@@ -44,4 +44,9 @@ interface ExpenseInvoicesApiService {
     suspend fun getSummary(
         @Query("period") period: String? = null
     ): Response<ExpenseInvoiceSummaryDto>
+
+    @retrofit2.http.DELETE("v1/expense-invoices/{id}")
+    suspend fun deleteInvoice(
+        @retrofit2.http.Path("id") id: Long
+    ): Response<Map<String, Any>>
 }

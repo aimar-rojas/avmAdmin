@@ -238,6 +238,28 @@ class ExpenseInvoicesViewModel @Inject constructor(
         }
     }
 
+    fun deleteInvoice(id: Long, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val result = repository.deleteInvoice(id)
+            result.fold(
+                onSuccess = {
+                    loadInvoices()
+                    onDone()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = err.message ?: "Error al eliminar comprobante"
+                        )
+                    }
+                    onDone()
+                }
+            )
+        }
+    }
+
     private fun extractPeriodFromDate(dateStr: String): String? {
         if (dateStr.isBlank()) return null
         val dmyParts = dateStr.split("/")

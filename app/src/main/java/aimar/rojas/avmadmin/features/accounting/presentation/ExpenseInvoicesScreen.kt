@@ -47,6 +47,11 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseInvoicesScreen(
@@ -58,7 +63,60 @@ fun ExpenseInvoicesScreen(
     val activity = context as? Activity
     var inspectingInvoice by remember { mutableStateOf<ExpenseInvoice?>(null) }
     var fullscreenPhotoUrl by remember { mutableStateOf<String?>(null) }
+    var invoiceToDelete by remember { mutableStateOf<ExpenseInvoice?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Diálogo de confirmación para eliminar comprobante
+    if (invoiceToDelete != null) {
+        val invoice = invoiceToDelete!!
+        AlertDialog(
+            onDismissRequest = { invoiceToDelete = null },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Eliminar comprobante",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                val name = invoice.supplierName.ifEmpty { "este comprobante" }
+                val seriesNumber = if (invoice.series.isNotEmpty() || invoice.number.isNotEmpty()) {
+                    " (${invoice.series}-${invoice.number})"
+                } else ""
+                Text(
+                    text = "¿Deseas eliminar el comprobante de $name$seriesNumber por S/ ${String.format(Locale.US, "%.2f", invoice.totalAmount)}? Esta acción no se puede deshacer."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val id = invoice.id
+                        invoiceToDelete = null
+                        inspectingInvoice = null
+                        viewModel.deleteInvoice(id.toLong())
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Text("Eliminar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { invoiceToDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     // Bottom Sheet de Inspección de Comprobante
     if (inspectingInvoice != null) {
@@ -72,7 +130,12 @@ fun ExpenseInvoicesScreen(
             InvoiceDetailSheetContent(
                 invoice = inspectingInvoice!!,
                 onClose = { inspectingInvoice = null },
-                onExpandPhoto = { url -> fullscreenPhotoUrl = url }
+                onExpandPhoto = { url -> fullscreenPhotoUrl = url },
+                onDeleteClick = {
+                    val current = inspectingInvoice
+                    inspectingInvoice = null
+                    invoiceToDelete = current
+                }
             )
         }
     }
@@ -255,9 +318,10 @@ fun ExpenseInvoicesScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(uiState.invoices, key = { it.id }) { invoice ->
-                            InvoiceItemCard(
+                            SwipeableInvoiceItem(
                                 invoice = invoice,
-                                onClick = { inspectingInvoice = invoice }
+                                onClick = { inspectingInvoice = invoice },
+                                onDelete = { invoiceToDelete = invoice }
                             )
                         }
                         item {
@@ -405,6 +469,65 @@ fun MonthlySummaryCard(summary: MonthlyInvoiceSummary) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeableInvoiceItem(
+    invoice: ExpenseInvoice,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.StartToEnd || value == SwipeToDismissBoxValue.EndToStart) {
+                onDelete()
+                false
+            } else {
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            val isStartToEnd = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+            val alignment = if (isStartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = alignment
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Eliminar",
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Text(
+                        text = "Eliminar",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+        }
+    ) {
+        InvoiceItemCard(
+            invoice = invoice,
+            onClick = onClick
+        )
+    }
+}
+
 @Composable
 fun InvoiceItemCard(
     invoice: ExpenseInvoice,
@@ -536,7 +659,8 @@ fun InvoiceItemCard(
 fun InvoiceDetailSheetContent(
     invoice: ExpenseInvoice,
     onClose: () -> Unit,
-    onExpandPhoto: (String) -> Unit
+    onExpandPhoto: (String) -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -902,6 +1026,27 @@ fun InvoiceDetailSheetContent(
                         )
                     }
                 }
+            }
+
+            // 4. Botón Eliminar Comprobante
+            OutlinedButton(
+                onClick = onDeleteClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Eliminar comprobante", fontWeight = FontWeight.SemiBold)
             }
         }
     }

@@ -31,4 +31,6 @@ interface ExpenseInvoicesRepository {
         category: String?,
         description: String?
     ): Result<ExpenseInvoice>
+
+    suspend fun deleteInvoice(id: Long): Result<Unit>
 }
