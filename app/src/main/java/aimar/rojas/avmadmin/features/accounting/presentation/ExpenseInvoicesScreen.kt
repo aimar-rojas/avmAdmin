@@ -150,11 +150,14 @@ fun ExpenseInvoicesScreen(
                         label = { Text("Todos") }
                     )
                 }
-                items(EXPENSE_CATEGORIES) { cat ->
+                items(EXPENSE_CATEGORY_ITEMS) { item ->
                     FilterChip(
-                        selected = uiState.selectedCategory == cat,
-                        onClick = { viewModel.onCategoryFilterChanged(cat) },
-                        label = { Text(cat, style = MaterialTheme.typography.labelSmall) }
+                        selected = uiState.selectedCategory == item.code,
+                        onClick = { viewModel.onCategoryFilterChanged(item.code) },
+                        label = { Text(item.label, style = MaterialTheme.typography.labelSmall) },
+                        leadingIcon = {
+                            Icon(item.icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
                     )
                 }
             }

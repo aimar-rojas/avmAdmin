@@ -11,7 +11,6 @@ class InvoiceOcrScannerTest {
 
     @Test
     fun testOcrParsing_PeruInvoice() {
-        // Simular texto extraído de una factura típica peruana
         val sampleText = """
             ESTACION DE SERVICIOS EL SOL S.A.C.
             AV. PANAMERICANA SUR KM 298 - ICA
@@ -25,16 +24,17 @@ class InvoiceOcrScannerTest {
             TOTAL A PAGAR: S/ 118.00
         """.trimIndent()
 
-        // Crear una instancia de prueba o invocar la lógica de parsing
-        val rucPattern = java.util.regex.Pattern.compile("""\b(10|20)\d{9}\b""")
-        val rucMatcher = rucPattern.matcher(sampleText)
-        assertTrue(rucMatcher.find())
-        assertEquals("20601234567", rucMatcher.group(0))
+        val lines = sampleText.lines()
+        val parsed = scanner.parseRawText(sampleText, lines)
 
-        val invPattern = java.util.regex.Pattern.compile("""\b([FE][A-Z0-9]{3})[- ]?(\d{1,8})\b""")
-        val invMatcher = invPattern.matcher(sampleText)
-        assertTrue(invMatcher.find())
-        assertEquals("F001", invMatcher.group(1))
-        assertEquals("00045231", invMatcher.group(2))
+        assertEquals("20601234567", parsed.supplierRuc)
+        assertEquals("F001", parsed.series)
+        assertEquals("00045231", parsed.number)
+        assertEquals("FACTURA", parsed.documentType)
+        assertEquals("2026-09-18", parsed.issueDate)
+        assertEquals("118.00", parsed.totalAmount)
+        assertEquals("100.00", parsed.subtotal)
+        assertEquals("18.00", parsed.taxAmount)
+        assertTrue(parsed.supplierName.contains("ESTACION DE SERVICIOS EL SOL"))
     }
 }

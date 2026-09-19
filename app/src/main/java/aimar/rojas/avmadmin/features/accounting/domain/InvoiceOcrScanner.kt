@@ -16,7 +16,9 @@ import java.util.regex.Pattern
 
 class InvoiceOcrScanner {
 
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    private val recognizer by lazy {
+        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
 
     suspend fun processImage(context: Context, imageUri: Uri): InvoiceOcrData =
         suspendCancellableCoroutine { continuation ->
@@ -37,7 +39,10 @@ class InvoiceOcrScanner {
     fun parseInvoiceText(visionText: Text): InvoiceOcrData {
         val fullText = visionText.text
         val lines = visionText.textBlocks.flatMap { it.lines.map { line -> line.text.trim() } }
+        return parseRawText(fullText, lines)
+    }
 
+    fun parseRawText(fullText: String, lines: List<String>): InvoiceOcrData {
         var ruc = ""
         var supplierName = ""
         var docType = "FACTURA"
@@ -119,7 +124,7 @@ class InvoiceOcrScanner {
         for (i in lines.indices) {
             val line = lines[i].uppercase()
 
-            if (total.isEmpty() && (line.contains("TOTAL A PAGAR") || line.contains("IMPORTE TOTAL") || line.contains("TOTAL") || line.contains("VENTA TOTAL") || line.contains("TOTAL VENTA"))) {
+            if (total.isEmpty() && !line.contains("SUBTOTAL") && (line.contains("TOTAL A PAGAR") || line.contains("IMPORTE TOTAL") || line.contains("TOTAL") || line.contains("VENTA TOTAL") || line.contains("TOTAL VENTA"))) {
                 val match = amountPattern.matcher(line)
                 if (match.find()) {
                     total = cleanAmount(match.group(1) ?: "")
@@ -175,7 +180,6 @@ class InvoiceOcrScanner {
         }
 
         if (supplierName.isEmpty() && lines.isNotEmpty()) {
-            // Primeras líneas no vacías suelen ser el nombre comercial
             val candidate = lines.firstOrNull { it.length in 5..50 && !it.contains("RUC", ignoreCase = true) && !it.contains("FACTURA", ignoreCase = true) }
             if (candidate != null) {
                 supplierName = candidate
@@ -198,7 +202,6 @@ class InvoiceOcrScanner {
 
     private fun cleanAmount(amountStr: String): String {
         var clean = amountStr.replace(",", ".")
-        // Si hay múltiples puntos, dejar solo el último como separador decimal
         val parts = clean.split(".")
         if (parts.size > 2) {
             clean = parts.dropLast(1).joinToString("") + "." + parts.last()
