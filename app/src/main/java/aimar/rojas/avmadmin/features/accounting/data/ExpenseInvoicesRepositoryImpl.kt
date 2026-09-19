@@ -128,6 +128,14 @@ class ExpenseInvoicesRepositoryImpl @Inject constructor(
     }
 
     private fun ExpenseInvoiceDto.toDomain(): ExpenseInvoice {
+        val rawUrl = fileUrl.orEmpty()
+        val fullUrl = when {
+            rawUrl.isEmpty() -> ""
+            rawUrl.startsWith("http://") || rawUrl.startsWith("https://") -> rawUrl
+            rawUrl.startsWith("/") -> "https://api.productosaimar.com$rawUrl"
+            else -> "https://api.productosaimar.com/$rawUrl"
+        }
+
         return ExpenseInvoice(
             id = id,
             bossId = bossId,
@@ -145,7 +153,7 @@ class ExpenseInvoicesRepositoryImpl @Inject constructor(
             category = category ?: "OTROS",
             description = description.orEmpty(),
             storageKey = storageKey.orEmpty(),
-            fileUrl = fileUrl.orEmpty(),
+            fileUrl = fullUrl,
             status = status ?: "PENDING",
             verifiedAt = verifiedAt
         )
