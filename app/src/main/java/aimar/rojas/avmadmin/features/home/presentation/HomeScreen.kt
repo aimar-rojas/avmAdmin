@@ -149,7 +149,7 @@ fun HomeScreen(
                     onClick = { navController.navigate("workers") }
                 )
                 HomeActionCard(
-                    title = "Facturas / Gastos",
+                    title = "Facturas",
                     subtitle = "Escanear facturas",
                     icon = Icons.Filled.ReceiptLong,
                     modifier = Modifier.weight(1f),
