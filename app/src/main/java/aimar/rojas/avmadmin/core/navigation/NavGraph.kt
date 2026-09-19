@@ -17,6 +17,11 @@ import aimar.rojas.avmadmin.features.apuntes.presentation.ApuntesScreen
 import aimar.rojas.avmadmin.features.apuntes.presentation.ApuntesHistoryScreen
 import aimar.rojas.avmadmin.features.sync.presentation.PendingSyncScreen
 import aimar.rojas.avmadmin.features.workers.presentation.WorkersScreen
+import aimar.rojas.avmadmin.features.accounting.presentation.ExpenseInvoicesScreen
+import aimar.rojas.avmadmin.features.accounting.presentation.ExpenseInvoicesViewModel
+import aimar.rojas.avmadmin.features.accounting.presentation.ScanExpenseInvoiceScreen
+import androidx.compose.runtime.remember
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
@@ -97,6 +102,19 @@ fun NavGraph(
 
         composable("sync_pending") {
             PendingSyncScreen(navController = navController)
+        }
+
+        composable("expense_invoices") { backStackEntry ->
+            val viewModel: ExpenseInvoicesViewModel = hiltViewModel(backStackEntry)
+            ExpenseInvoicesScreen(navController = navController, viewModel = viewModel)
+        }
+
+        composable("scan_expense_invoice") { backStackEntry ->
+            val parentEntry = remember(backStackEntry) {
+                navController.getBackStackEntry("expense_invoices")
+            }
+            val viewModel: ExpenseInvoicesViewModel = hiltViewModel(parentEntry)
+            ScanExpenseInvoiceScreen(navController = navController, viewModel = viewModel)
         }
     }
 }

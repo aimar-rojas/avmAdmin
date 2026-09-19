@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -147,7 +148,15 @@ fun HomeScreen(
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     onClick = { navController.navigate("workers") }
                 )
-                Spacer(modifier = Modifier.weight(1f))
+                HomeActionCard(
+                    title = "Facturas / Gastos",
+                    subtitle = "Escanear facturas",
+                    icon = Icons.Filled.ReceiptLong,
+                    modifier = Modifier.weight(1f),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    onClick = { navController.navigate("expense_invoices") }
+                )
             }
         }
 

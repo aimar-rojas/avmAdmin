@@ -125,6 +125,13 @@ dependencies {
     kapt(libs.room.compiler)
     implementation(libs.room.ktx)
 
+    // ML Kit & Document Scanner
+    implementation(libs.play.services.mlkit.document.scanner)
+    implementation(libs.play.services.mlkit.text.recognition)
+
+    // Coil Image Loading
+    implementation(libs.coil.compose)
+
     // WorkManager & Hilt
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("androidx.hilt:hilt-work:1.2.0")
