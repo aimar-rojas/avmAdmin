@@ -104,26 +104,28 @@ class ExpenseInvoicesViewModel @Inject constructor(
             var aiSuccess = false
             try {
                 val tempWebpFile = withContext(Dispatchers.IO) {
-                    ImageUtils.compressAndSaveToWebp(context, imageUri)
+                    ImageUtils.compressAndSaveToWebp(context, imageUri, enableSmartEnhancement = true)
+                }
+                val enhancedUri = Uri.fromFile(tempWebpFile)
+
+                // Actualizar la URI en el formulario para que la vista previa muestre la imagen optimizada
+                _formState.update {
+                    it.copy(
+                        scannedImageUri = enhancedUri,
+                        processingStage = InvoiceProcessingStage.ANALYZING_WITH_AI
+                    )
                 }
 
-                try {
-                    _formState.update {
-                        it.copy(processingStage = InvoiceProcessingStage.ANALYZING_WITH_AI)
+                val aiResult = repository.parseInvoiceWithAi(tempWebpFile)
+                aiResult.fold(
+                    onSuccess = { ocrData ->
+                        aiSuccess = true
+                        applyExtractedData(ocrData, InvoiceExtractionSource.AI)
+                    },
+                    onFailure = {
+                        aiSuccess = false
                     }
-                    val aiResult = repository.parseInvoiceWithAi(tempWebpFile)
-                    aiResult.fold(
-                        onSuccess = { ocrData ->
-                            aiSuccess = true
-                            applyExtractedData(ocrData, InvoiceExtractionSource.AI)
-                        },
-                        onFailure = {
-                            aiSuccess = false
-                        }
-                    )
-                } finally {
-                    tempWebpFile.delete()
-                }
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -136,8 +138,9 @@ class ExpenseInvoicesViewModel @Inject constructor(
                     _formState.update {
                         it.copy(processingStage = InvoiceProcessingStage.USING_LOCAL_OCR)
                     }
+                    val targetUri = _formState.value.scannedImageUri ?: imageUri
                     val localOcrData = withContext(Dispatchers.IO) {
-                        ocrScanner.processImage(context, imageUri)
+                        ocrScanner.processImage(context, targetUri)
                     }
 
                     applyExtractedData(localOcrData, InvoiceExtractionSource.LOCAL_OCR)
