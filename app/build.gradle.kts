@@ -128,6 +128,7 @@ dependencies {
     // ML Kit & Document Scanner
     implementation(libs.play.services.mlkit.document.scanner)
     implementation(libs.play.services.mlkit.text.recognition)
+    implementation(libs.play.services.mlkit.barcode.scanning)
 
     // Coil Image Loading
     implementation(libs.coil.compose)

@@ -1,6 +1,7 @@
 package aimar.rojas.avmadmin.features.accounting.presentation
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +9,8 @@ import aimar.rojas.avmadmin.features.accounting.data.ImageUtils
 import aimar.rojas.avmadmin.features.accounting.domain.DuplicateExpenseInvoiceException
 import aimar.rojas.avmadmin.features.accounting.domain.ExpenseInvoicesRepository
 import aimar.rojas.avmadmin.features.accounting.domain.InvoiceOcrScanner
+import aimar.rojas.avmadmin.features.accounting.domain.JevCategoryRuleEngine
+import aimar.rojas.avmadmin.features.accounting.domain.SunatQrParser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -91,78 +95,147 @@ class ExpenseInvoicesViewModel @Inject constructor(
     }
 
     fun onImageScanned(imageUri: Uri) {
+        onDocumentSelected(imageUri)
+    }
+
+    fun onDocumentSelected(documentUri: Uri) {
         ocrJob?.cancel()
+        val isPdf = ImageUtils.isPdfUri(context, documentUri)
+
         _formState.update {
             ScanInvoiceFormUiState(
-                scannedImageUri = imageUri,
+                scannedImageUri = documentUri,
+                originalFileUri = documentUri,
+                isPdf = isPdf,
                 isOcrProcessing = true,
                 processingStage = InvoiceProcessingStage.PREPARING_IMAGE
             )
         }
 
         ocrJob = viewModelScope.launch {
-            var aiSuccess = false
             try {
-                val tempWebpFile = withContext(Dispatchers.IO) {
-                    ImageUtils.compressAndSaveToWebp(context, imageUri, enableSmartEnhancement = true)
-                }
-                val enhancedUri = Uri.fromFile(tempWebpFile)
+                // 1. Preparar archivo de previsualización (WebP) y bitmap para análisis
+                val previewUri: Uri
+                val previewWebpFile: File
+                var previewBitmap: Bitmap? = null
 
-                // Actualizar la URI en el formulario para que la vista previa muestre la imagen optimizada
+                if (isPdf) {
+                    val renderedBitmap = withContext(Dispatchers.IO) {
+                        ImageUtils.renderPdfFirstPageToBitmap(context, documentUri)
+                    }
+                    previewBitmap = renderedBitmap
+                    previewWebpFile = withContext(Dispatchers.IO) {
+                        ImageUtils.renderPdfFirstPageToWebp(context, documentUri)
+                    }
+                    previewUri = Uri.fromFile(previewWebpFile)
+                } else {
+                    previewWebpFile = withContext(Dispatchers.IO) {
+                        ImageUtils.compressAndSaveToWebp(context, documentUri, enableSmartEnhancement = true)
+                    }
+                    previewUri = Uri.fromFile(previewWebpFile)
+                }
+
                 _formState.update {
                     it.copy(
-                        scannedImageUri = enhancedUri,
-                        processingStage = InvoiceProcessingStage.ANALYZING_WITH_AI
+                        scannedImageUri = previewUri,
+                        processingStage = InvoiceProcessingStage.DECODING_SUNAT_QR
                     )
                 }
 
-                val aiResult = repository.parseInvoiceWithAi(tempWebpFile)
+                // 2. PASO 1 ($0 tokens, 100% exactitud): Escanear y Decodificar Código QR SUNAT
+                val qrData = withContext(Dispatchers.IO) {
+                    if (previewBitmap != null) {
+                        SunatQrParser.scanAndParseQrFromBitmap(previewBitmap)
+                    } else {
+                        SunatQrParser.scanAndParseQr(context, previewUri)
+                    }
+                }
+
+                if (qrData != null && qrData.supplierRuc.isNotBlank()) {
+                    // Si encontramos el QR SUNAT, el RUC emisor, serie, número, fecha y montos son 100% exactos.
+                    // Usamos OCR local complementario (<50ms) solo para extraer la Razón Social, Placa y Descripción
+                    val localOcrData = withContext(Dispatchers.IO) {
+                        try {
+                            if (previewBitmap != null) {
+                                ocrScanner.processBitmap(previewBitmap)
+                            } else {
+                                ocrScanner.processImage(context, previewUri)
+                            }
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+
+                    val rawText = localOcrData?.rawText ?: qrData.rawText
+                    val supplierName = localOcrData?.supplierName?.takeIf { it.isNotBlank() } ?: ""
+                    val category = JevCategoryRuleEngine.classifyCategory(supplierName, rawText)
+                    val description = JevCategoryRuleEngine.buildSmartDescription(rawText, supplierName, category)
+
+                    val enrichedData = qrData.copy(
+                        supplierName = supplierName,
+                        category = category,
+                        description = description,
+                        rawText = rawText
+                    )
+
+                    previewBitmap?.recycle()
+                    applyExtractedData(enrichedData, InvoiceExtractionSource.SUNAT_QR)
+                    return@launch
+                }
+
+                // 3. PASO 2 (Sin QR detectado): Análisis Inteligente con IA
+                _formState.update {
+                    it.copy(processingStage = InvoiceProcessingStage.ANALYZING_WITH_AI)
+                }
+
+                var aiSuccess = false
+                val aiResult = repository.parseInvoiceWithAi(previewWebpFile)
                 aiResult.fold(
                     onSuccess = { ocrData ->
                         aiSuccess = true
+                        previewBitmap?.recycle()
                         applyExtractedData(ocrData, InvoiceExtractionSource.AI)
                     },
                     onFailure = {
                         aiSuccess = false
                     }
                 )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                aiSuccess = false
-            }
 
-            // Fallback a OCR local (ML Kit) si la IA remota no responde o falla
-            if (!aiSuccess) {
-                try {
+                // 4. PASO 3 (Fallback local): ML Kit Text Recognition + Motor de Reglas JEV
+                if (!aiSuccess) {
                     _formState.update {
                         it.copy(processingStage = InvoiceProcessingStage.USING_LOCAL_OCR)
                     }
-                    val targetUri = _formState.value.scannedImageUri ?: imageUri
+
                     val localOcrData = withContext(Dispatchers.IO) {
-                        ocrScanner.processImage(context, targetUri)
+                        if (previewBitmap != null) {
+                            ocrScanner.processBitmap(previewBitmap)
+                        } else {
+                            ocrScanner.processImage(context, previewUri)
+                        }
                     }
 
+                    previewBitmap?.recycle()
                     applyExtractedData(localOcrData, InvoiceExtractionSource.LOCAL_OCR)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    _formState.update {
-                        it.copy(
-                            isOcrProcessing = false,
-                            processingStage = InvoiceProcessingStage.COMPLETED,
-                            supplierRuc = it.supplierRuc.orDash(),
-                            supplierName = it.supplierName.orDash(),
-                            series = it.series.orDash(),
-                            number = it.number.orDash(),
-                            issueDate = it.issueDate.ifBlank { currentDateInPeruvianFormat() },
-                            subtotal = it.subtotal.ifBlank { "0.00" },
-                            taxAmount = it.taxAmount.ifBlank { "0.00" },
-                            category = it.category.ifBlank { "OTROS" },
-                            description = it.description.orDash(),
-                            errorMessage = "No se pudo leer el comprobante automáticamente. Puedes ingresar los datos manualmente."
-                        )
-                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _formState.update {
+                    it.copy(
+                        isOcrProcessing = false,
+                        processingStage = InvoiceProcessingStage.COMPLETED,
+                        supplierRuc = it.supplierRuc.orDash(),
+                        supplierName = it.supplierName.orDash(),
+                        series = it.series.orDash(),
+                        number = it.number.orDash(),
+                        issueDate = it.issueDate.ifBlank { currentDateInPeruvianFormat() },
+                        subtotal = it.subtotal.ifBlank { "0.00" },
+                        taxAmount = it.taxAmount.ifBlank { "0.00" },
+                        category = it.category.ifBlank { "OTROS" },
+                        description = it.description.orDash(),
+                        errorMessage = "No se pudo leer el comprobante automáticamente. Puedes ingresar los datos manualmente."
+                    )
                 }
             }
         }
@@ -216,7 +289,7 @@ class ExpenseInvoicesViewModel @Inject constructor(
         val state = _formState.value
         if (state.isOcrProcessing) return
 
-        val uri = state.scannedImageUri
+        val uri = state.originalFileUri ?: state.scannedImageUri
 
         if (uri == null) {
             _formState.update { it.copy(errorMessage = "Debes escanear o seleccionar un comprobante") }
@@ -239,9 +312,13 @@ class ExpenseInvoicesViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // 1. Convertir y comprimir a WebP en hilo IO
-                val compressedWebpFile = withContext(Dispatchers.IO) {
-                    ImageUtils.compressAndSaveToWebp(context, uri)
+                // 1. Preparar archivo para subir: PDF original o imagen WebP comprimida
+                val fileToUpload = withContext(Dispatchers.IO) {
+                    if (state.isPdf && state.originalFileUri != null) {
+                        ImageUtils.copyPdfToCache(context, state.originalFileUri)
+                    } else {
+                        ImageUtils.compressAndSaveToWebp(context, uri)
+                    }
                 }
 
                 val subtotal = state.subtotal.toDoubleOrNull()
@@ -250,7 +327,7 @@ class ExpenseInvoicesViewModel @Inject constructor(
 
                 // 2. Enviar a backend
                 val result = repository.createInvoice(
-                    file = compressedWebpFile,
+                    file = fileToUpload,
                     totalAmount = totalAmount,
                     subtotal = subtotal,
                     taxAmount = taxAmount,
@@ -267,7 +344,7 @@ class ExpenseInvoicesViewModel @Inject constructor(
                 )
 
                 // Limpiar archivo temporal
-                compressedWebpFile.delete()
+                fileToUpload.delete()
 
                 result.fold(
                     onSuccess = {

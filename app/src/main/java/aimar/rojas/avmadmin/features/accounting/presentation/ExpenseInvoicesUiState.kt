@@ -7,12 +7,14 @@ import aimar.rojas.avmadmin.features.accounting.domain.model.MonthlyInvoiceSumma
 enum class InvoiceProcessingStage {
     IDLE,
     PREPARING_IMAGE,
+    DECODING_SUNAT_QR,
     ANALYZING_WITH_AI,
     USING_LOCAL_OCR,
     COMPLETED
 }
 
 enum class InvoiceExtractionSource {
+    SUNAT_QR,
     AI,
     LOCAL_OCR
 }
@@ -28,6 +30,8 @@ data class ExpenseInvoicesUiState(
 
 data class ScanInvoiceFormUiState(
     val scannedImageUri: Uri? = null,
+    val originalFileUri: Uri? = null,
+    val isPdf: Boolean = false,
     val isOcrProcessing: Boolean = false,
     val processingStage: InvoiceProcessingStage = InvoiceProcessingStage.IDLE,
     val extractionSource: InvoiceExtractionSource? = null,

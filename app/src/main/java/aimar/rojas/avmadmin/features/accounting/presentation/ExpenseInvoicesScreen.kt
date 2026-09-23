@@ -175,6 +175,8 @@ fun ExpenseInvoicesScreen(
         }
     }
 
+    var showUploadChoiceSheet by remember { mutableStateOf(false) }
+
     // Modal de pantalla completa para ver la foto con zoom interactivo
     if (fullscreenPhotoUrl != null) {
         FullscreenPhotoViewerSheet(
@@ -183,7 +185,7 @@ fun ExpenseInvoicesScreen(
         )
     }
 
-    // Configuración del lanzador de escaneo nativo de Google Play Services
+    // Configuración del lanzador de escaneo nativo de Google Play Services (Modo Manual)
     val scannerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
@@ -191,9 +193,19 @@ fun ExpenseInvoicesScreen(
             val gmsResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
             val pageUri = gmsResult?.pages?.firstOrNull()?.imageUri
             if (pageUri != null) {
-                viewModel.onImageScanned(pageUri)
+                viewModel.onDocumentSelected(pageUri)
                 navController.navigate("scan_expense_invoice")
             }
+        }
+    }
+
+    // Configuración del selector de archivos (Soporta PDFs de WhatsApp y Descargas e imágenes)
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.onDocumentSelected(uri)
+            navController.navigate("scan_expense_invoice")
         }
     }
 
@@ -212,8 +224,144 @@ fun ExpenseInvoicesScreen(
                     scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
                 }
                 .addOnFailureListener {
-                    // Si falla el scanner nativo de Google Play Services
+                    // Fallback a selector de archivos si el escáner Play Services falla
+                    filePickerLauncher.launch(arrayOf("application/pdf", "image/*"))
                 }
+        }
+    }
+
+    // Bottom Sheet de Selección de Origen (Cámara Manual vs PDF / Archivos de WhatsApp/Descargas)
+    if (showUploadChoiceSheet) {
+        val choiceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showUploadChoiceSheet = false },
+            sheetState = choiceSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Registrar Comprobante",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Elige cómo deseas ingresar la factura o boleta de gasto:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Opción 1: Cámara Manual con Escáner ML Kit
+                Surface(
+                    onClick = {
+                        showUploadChoiceSheet = false
+                        launchScanner()
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Escanear con Cámara (Manual)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Enfoca y captura el documento físico a tu ritmo con encuadre guiado",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Opción 2: Selector de Archivos (PDFs de WhatsApp, Descargas e Imágenes)
+                Surface(
+                    onClick = {
+                        showUploadChoiceSheet = false
+                        filePickerLauncher.launch(arrayOf("application/pdf", "image/*"))
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.PictureAsPdf,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Subir PDF / Archivo",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Facturas electrónicas recibidas por WhatsApp, Descargas o Archivos",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -250,9 +398,9 @@ fun ExpenseInvoicesScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { launchScanner() },
-                icon = { Icon(Icons.Default.DocumentScanner, contentDescription = null) },
-                text = { Text("Escanear Factura", fontWeight = FontWeight.SemiBold) },
+                onClick = { showUploadChoiceSheet = true },
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("Registrar Factura", fontWeight = FontWeight.SemiBold) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             )

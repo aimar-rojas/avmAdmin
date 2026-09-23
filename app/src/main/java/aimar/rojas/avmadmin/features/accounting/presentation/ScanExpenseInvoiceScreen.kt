@@ -348,7 +348,7 @@ fun ScanExpenseInvoiceScreen(
                                 contentScale = ContentScale.Fit
                             )
 
-                            // Badge de imagen optimizada automáticamente
+                            // Badge de formato / optimización
                             Surface(
                                 color = Color.Black.copy(alpha = 0.65f),
                                 shape = RoundedCornerShape(20.dp),
@@ -362,13 +362,13 @@ fun ScanExpenseInvoiceScreen(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
+                                        imageVector = if (formState.isPdf) Icons.Default.PictureAsPdf else Icons.Default.AutoAwesome,
                                         contentDescription = null,
                                         tint = Color(0xFFCDEDA3),
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Text(
-                                        text = "Imagen optimizada",
+                                        text = if (formState.isPdf) "Documento PDF" else "Imagen optimizada",
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Medium
@@ -407,11 +407,13 @@ fun ScanExpenseInvoiceScreen(
                     }
 
                     if (formState.supplierRuc.isNotEmpty() || formState.totalAmount.isNotEmpty()) {
+                        val isQr = formState.extractionSource == InvoiceExtractionSource.SUNAT_QR
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(
-                                    MaterialTheme.colorScheme.secondaryContainer,
+                                    if (isQr) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                    else MaterialTheme.colorScheme.secondaryContainer,
                                     RoundedCornerShape(8.dp)
                                 )
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -419,19 +421,24 @@ fun ScanExpenseInvoiceScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AutoAwesome,
+                                imageVector = when (formState.extractionSource) {
+                                    InvoiceExtractionSource.SUNAT_QR -> Icons.Default.QrCodeScanner
+                                    InvoiceExtractionSource.AI -> Icons.Default.AutoAwesome
+                                    else -> Icons.Default.DocumentScanner
+                                },
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
+                                tint = if (isQr) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = when (formState.extractionSource) {
-                                    InvoiceExtractionSource.LOCAL_OCR -> "Datos leídos en el dispositivo. Revisa y confirma."
-                                    else -> "Datos extraídos con IA. Revisa y confirma."
+                                    InvoiceExtractionSource.SUNAT_QR -> "⚡ QR SUNAT oficial decodificado (100% exactitud)."
+                                    InvoiceExtractionSource.LOCAL_OCR -> "🔍 Datos leídos en dispositivo con OCR. Revisa y confirma."
+                                    else -> "✨ Datos extraídos con IA. Revisa y confirma."
                                 },
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                fontWeight = FontWeight.Medium
+                                color = if (isQr) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -940,19 +947,22 @@ private fun InvoiceProcessingScreen(
     onBack: () -> Unit
 ) {
     val (title, detail) = when (processingStage) {
-        InvoiceProcessingStage.PREPARING_IMAGE -> "Preparando la evidencia" to
-            "Ajustamos la imagen para conservar cada dato del comprobante."
-        InvoiceProcessingStage.ANALYZING_WITH_AI -> "Convirtiendo imagen en registro" to
-            "Identificamos emisor, importes y categoría del gasto."
-        InvoiceProcessingStage.USING_LOCAL_OCR -> "Terminando la lectura en tu dispositivo" to
-            "Continuamos con el reconocimiento local para que puedas revisar el registro."
-        else -> "Preparando la evidencia" to "Un momento, por favor."
+        InvoiceProcessingStage.PREPARING_IMAGE -> "Preparando documento" to
+            "Optimizando resolución y nitidez para lectura automática."
+        InvoiceProcessingStage.DECODING_SUNAT_QR -> "Decodificando QR SUNAT" to
+            "Extrayendo RUC oficial, serie, correlativo y montos SUNAT ($0 tokens)."
+        InvoiceProcessingStage.ANALYZING_WITH_AI -> "Extrayendo datos con IA" to
+            "Identificamos emisor, importes y categorización del gasto."
+        InvoiceProcessingStage.USING_LOCAL_OCR -> "Lectura rápida en dispositivo" to
+            "Reconocimiento óptico de caracteres y reglas contables."
+        else -> "Procesando comprobante" to "Un momento, por favor."
     }
     val activeStep = when (processingStage) {
         InvoiceProcessingStage.PREPARING_IMAGE -> 0
+        InvoiceProcessingStage.DECODING_SUNAT_QR,
         InvoiceProcessingStage.ANALYZING_WITH_AI,
         InvoiceProcessingStage.USING_LOCAL_OCR -> 1
-        else -> 0
+        else -> 2
     }
     val scanTransition = rememberInfiniteTransition(label = "invoiceScan")
     val scanProgress by scanTransition.animateFloat(

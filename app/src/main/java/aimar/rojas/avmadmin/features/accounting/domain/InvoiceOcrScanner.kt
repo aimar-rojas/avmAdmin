@@ -1,6 +1,7 @@
 package aimar.rojas.avmadmin.features.accounting.domain
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import aimar.rojas.avmadmin.features.accounting.domain.model.InvoiceOcrData
 import com.google.mlkit.vision.common.InputImage
@@ -24,6 +25,22 @@ class InvoiceOcrScanner {
         suspendCancellableCoroutine { continuation ->
             try {
                 val inputImage = InputImage.fromFilePath(context, imageUri)
+                recognizer.process(inputImage)
+                    .addOnSuccessListener { visionText ->
+                        continuation.resume(parseInvoiceText(visionText))
+                    }
+                    .addOnFailureListener { exception ->
+                        continuation.resumeWithException(exception)
+                    }
+            } catch (e: Exception) {
+                continuation.resumeWithException(e)
+            }
+        }
+
+    suspend fun processBitmap(bitmap: Bitmap): InvoiceOcrData =
+        suspendCancellableCoroutine { continuation ->
+            try {
+                val inputImage = InputImage.fromBitmap(bitmap, 0)
                 recognizer.process(inputImage)
                     .addOnSuccessListener { visionText ->
                         continuation.resume(parseInvoiceText(visionText))
@@ -147,6 +164,10 @@ class InvoiceOcrScanner {
 
         // 4. Montos (Total, Subtotal, IGV)
         val amountPattern = Pattern.compile("""(\d{1,6}(?:[.,]\d{2}))""")
+        val isExoneratedOrInafecta = fullText.contains("EXONERAD", ignoreCase = true) ||
+                                     fullText.contains("INAFECT", ignoreCase = true) ||
+                                     fullText.contains("OP. EXONERADA", ignoreCase = true) ||
+                                     fullText.contains("OPERACION EXONERADA", ignoreCase = true)
 
         for (i in lines.indices) {
             val line = lines[i].uppercase()
@@ -163,7 +184,7 @@ class InvoiceOcrScanner {
                 }
             }
 
-            if (subtotal.isEmpty() && (line.contains("SUBTOTAL") || line.contains("OP. GRAVADA") || line.contains("OP GRAVADA") || line.contains("VALOR VENTA") || line.contains("GRAVADA"))) {
+            if (subtotal.isEmpty() && (line.contains("SUBTOTAL") || line.contains("OP. GRAVADA") || line.contains("OP GRAVADA") || line.contains("VALOR VENTA") || line.contains("GRAVADA") || line.contains("OP. EXONERADA") || line.contains("OP. INAFECTA"))) {
                 val match = amountPattern.matcher(line)
                 if (match.find()) {
                     subtotal = cleanAmount(match.group(1) ?: "")
@@ -178,18 +199,27 @@ class InvoiceOcrScanner {
             }
         }
 
-        // Si tenemos total pero no subtotal o IGV, calculamos automáticamente los valores estándar (18% IGV en Perú)
+        // Si tenemos total pero no subtotal o IGV, calculamos según sea gravada o exonerada
         if (total.isNotEmpty()) {
             val totalDouble = total.toDoubleOrNull() ?: 0.0
             if (totalDouble > 0.0) {
-                if (subtotal.isEmpty() && docType == "FACTURA") {
-                    val calcSubtotal = totalDouble / 1.18
-                    subtotal = String.format(Locale.US, "%.2f", calcSubtotal)
-                }
-                if (tax.isEmpty() && docType == "FACTURA") {
-                    val subDouble = subtotal.toDoubleOrNull() ?: (totalDouble / 1.18)
-                    val calcTax = totalDouble - subDouble
-                    tax = String.format(Locale.US, "%.2f", calcTax)
+                if (isExoneratedOrInafecta) {
+                    if (subtotal.isEmpty()) {
+                        subtotal = String.format(Locale.US, "%.2f", totalDouble)
+                    }
+                    if (tax.isEmpty()) {
+                        tax = "0.00"
+                    }
+                } else {
+                    if (subtotal.isEmpty() && docType == "FACTURA") {
+                        val calcSubtotal = totalDouble / 1.18
+                        subtotal = String.format(Locale.US, "%.2f", calcSubtotal)
+                    }
+                    if (tax.isEmpty() && docType == "FACTURA") {
+                        val subDouble = subtotal.toDoubleOrNull() ?: (totalDouble / 1.18)
+                        val calcTax = totalDouble - subDouble
+                        tax = String.format(Locale.US, "%.2f", calcTax)
+                    }
                 }
             }
         }
@@ -213,6 +243,9 @@ class InvoiceOcrScanner {
             }
         }
 
+        val category = JevCategoryRuleEngine.classifyCategory(supplierName, fullText)
+        val description = JevCategoryRuleEngine.buildSmartDescription(fullText, supplierName, category)
+
         return InvoiceOcrData(
             supplierRuc = ruc,
             supplierName = supplierName,
@@ -223,6 +256,8 @@ class InvoiceOcrScanner {
             subtotal = subtotal,
             taxAmount = tax,
             totalAmount = total,
+            category = category,
+            description = description,
             rawText = fullText
         )
     }

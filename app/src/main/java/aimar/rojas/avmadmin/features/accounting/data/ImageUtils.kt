@@ -4,17 +4,102 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import androidx.exifinterface.media.ExifInterface
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 
 object ImageUtils {
+
+    /**
+     * Verifica si una URI corresponde a un archivo PDF.
+     */
+    fun isPdfUri(context: Context, uri: Uri): Boolean {
+        val mimeType = context.contentResolver.getType(uri)
+        if (mimeType != null && mimeType.contains("pdf", ignoreCase = true)) {
+            return true
+        }
+        val path = uri.path?.lowercase() ?: ""
+        return path.endsWith(".pdf")
+    }
+
+    /**
+     * Copia un archivo PDF a cacheDir para subirlo de forma íntegra al backend.
+     */
+    fun copyPdfToCache(context: Context, pdfUri: Uri): File {
+        val outputFile = File(context.cacheDir, "invoice_${System.currentTimeMillis()}.pdf")
+        context.contentResolver.openInputStream(pdfUri)?.use { input ->
+            FileOutputStream(outputFile).use { output ->
+                input.copyTo(output)
+            }
+        } ?: throw IllegalArgumentException("No se pudo leer el archivo PDF")
+        return outputFile
+    }
+
+    /**
+     * Renderiza la primera página de un documento PDF a un Bitmap nítido para OCR y previsualización.
+     */
+    fun renderPdfFirstPageToBitmap(context: Context, pdfUri: Uri): Bitmap {
+        val pfd: ParcelFileDescriptor = context.contentResolver.openFileDescriptor(pdfUri, "r")
+            ?: throw IllegalArgumentException("No se pudo abrir el descriptor del archivo PDF")
+
+        try {
+            val renderer = PdfRenderer(pfd)
+            if (renderer.pageCount == 0) {
+                renderer.close()
+                throw IllegalArgumentException("El archivo PDF no contiene páginas")
+            }
+
+            val page = renderer.openPage(0)
+            val scale = 2.0f
+            val width = (page.width * scale).toInt()
+            val height = (page.height * scale).toInt()
+
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(Color.WHITE)
+
+            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            page.close()
+            renderer.close()
+
+            return bitmap
+        } finally {
+            try {
+                pfd.close()
+            } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Renderiza la primera página de un PDF y la guarda como WebP para previsualización o análisis.
+     */
+    fun renderPdfFirstPageToWebp(context: Context, pdfUri: Uri): File {
+        val bitmap = renderPdfFirstPageToBitmap(context, pdfUri)
+        val outputFile = File(context.cacheDir, "invoice_preview_${System.currentTimeMillis()}.webp")
+        val outputStream = FileOutputStream(outputFile)
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 85, outputStream)
+        } else {
+            @Suppress("DEPRECATION")
+            bitmap.compress(Bitmap.CompressFormat.WEBP, 85, outputStream)
+        }
+
+        outputStream.flush()
+        outputStream.close()
+        bitmap.recycle()
+
+        return outputFile
+    }
 
     /**
      * Procesa, optimiza y comprime la imagen escaneada:

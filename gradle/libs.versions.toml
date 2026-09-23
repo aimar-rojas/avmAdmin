@@ -22,9 +22,11 @@ room = "2.7.2"
 runtime = "1.11.4"
 playServicesMlkitDocumentScanner = "16.0.0-beta1"
 playServicesMlkitTextRecognition = "19.0.1"
+playServicesMlkitBarcodeScanning = "18.3.1"
 coilCompose = "2.7.0"
 
 [libraries]
+play-services-mlkit-barcode-scanning = { group = "com.google.android.gms", name = "play-services-mlkit-barcode-scanning", version.ref = "playServicesMlkitBarcodeScanning" }
 play-services-mlkit-document-scanner = { group = "com.google.android.gms", name = "play-services-mlkit-document-scanner", version.ref = "playServicesMlkitDocumentScanner" }
 play-services-mlkit-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "playServicesMlkitTextRecognition" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
