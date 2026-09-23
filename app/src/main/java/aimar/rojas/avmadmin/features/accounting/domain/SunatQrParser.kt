@@ -73,15 +73,47 @@ object SunatQrParser {
     }
 
     /**
-     * Decodifica la cadena estándar de QR SUNAT:
+     * Decodifica la cadena de QR SUNAT (Formato estándar con pipes, URLs de consulta o URL-encoded).
      * RUC_EMISOR|TIPO_DOC|SERIE|NUMERO|IGV|TOTAL|FECHA|TIPO_DOC_CLIENTE|NUM_DOC_CLIENTE|HASH
      */
     fun parseSunatQrString(rawString: String): InvoiceOcrData? {
-        val clean = rawString.trim()
-        if (!clean.contains("|")) return null
+        if (rawString.isBlank()) return null
+        var clean = rawString.trim()
 
+        // 1. Decodificar si viene con encoding URL (%7C -> |, %20 -> espacio, etc.)
+        try {
+            if (clean.contains("%")) {
+                clean = java.net.URLDecoder.decode(clean, "UTF-8").trim()
+            }
+        } catch (_: Exception) {}
+
+        // 2. Si es una URL que contiene pipes en los parámetros (ej: https://.../?d=2060...|01|F001|...)
+        if (clean.contains("|")) {
+            val pipeIndex = clean.indexOf("|")
+            val possibleStart = clean.substring(0, pipeIndex)
+            if (possibleStart.contains("=")) {
+                clean = clean.substring(clean.lastIndexOf("=") + 1)
+            }
+            return parsePipeFormat(clean, rawString)
+        }
+
+        // 3. Si es una URL con parámetros de consulta estándar (ej: https://.../?ruc=20...&serie=F001&numero=123...)
+        if (clean.startsWith("http", ignoreCase = true) && clean.contains("?")) {
+            val urlParsed = parseUrlQueryParams(clean, rawString)
+            if (urlParsed != null) return urlParsed
+        }
+
+        // 4. Si es un formato delimitado por guiones en URL (ej: /20608300393-01-F001-000123-145.50-2026-09-18)
+        if (clean.contains("-")) {
+            val dashParsed = parseDashFormat(clean, rawString)
+            if (dashParsed != null) return dashParsed
+        }
+
+        return null
+    }
+
+    private fun parsePipeFormat(clean: String, rawString: String): InvoiceOcrData? {
         val parts = clean.split("|").map { it.trim() }
-        // Se requieren al menos los primeros campos esenciales: RUC | TIPO | SERIE | NUMERO | IGV | TOTAL | FECHA
         if (parts.size < 6) return null
 
         val rucCandidate = parts[0]
@@ -96,7 +128,6 @@ object SunatQrParser {
         val taxStr = cleanAmount(parts.getOrNull(4) ?: "")
         val totalStr = cleanAmount(parts.getOrNull(5) ?: "")
         val rawDate = parts.getOrNull(6) ?: ""
-
         val formattedDate = normalizeDate(rawDate)
 
         var total = totalStr
@@ -108,12 +139,10 @@ object SunatQrParser {
 
         if (totalDouble > 0.0) {
             if (tax.isNotBlank()) {
-                // Si el QR especifica el IGV (incluso 0.00 en operaciones exoneradas o inafectas), respetarlo
                 val subDouble = (totalDouble - taxDouble).coerceAtLeast(0.0)
                 subtotal = String.format(Locale.US, "%.2f", subDouble)
                 tax = String.format(Locale.US, "%.2f", taxDouble)
             } else if (docType == "FACTURA") {
-                // Solo si el campo IGV no vino en el QR calculamos el 18% estándar
                 val subDouble = totalDouble / 1.18
                 subtotal = String.format(Locale.US, "%.2f", subDouble)
                 tax = String.format(Locale.US, "%.2f", totalDouble - subDouble)
@@ -125,7 +154,7 @@ object SunatQrParser {
 
         return InvoiceOcrData(
             supplierRuc = rucCandidate,
-            supplierName = "", // Se completará con Jev/Lookup o local OCR
+            supplierName = "",
             documentType = docType,
             series = series,
             number = number,
@@ -136,6 +165,89 @@ object SunatQrParser {
             rawText = rawString,
             isAiExtracted = false
         )
+    }
+
+    private fun parseUrlQueryParams(urlStr: String, rawString: String): InvoiceOcrData? {
+        return try {
+            val uri = android.net.Uri.parse(urlStr)
+            val ruc = uri.getQueryParameter("ruc") ?: uri.getQueryParameter("r") ?: uri.getQueryParameter("RUC") ?: ""
+            if (!Pattern.matches("""^(10|20)\d{9}$""", ruc)) return null
+
+            val docTypeParam = uri.getQueryParameter("tipo") ?: uri.getQueryParameter("t") ?: uri.getQueryParameter("tipoDoc") ?: "01"
+            val docType = mapDocType(docTypeParam)
+            val series = (uri.getQueryParameter("serie") ?: uri.getQueryParameter("s") ?: "").uppercase()
+            val number = uri.getQueryParameter("numero") ?: uri.getQueryParameter("n") ?: uri.getQueryParameter("num") ?: ""
+            val total = cleanAmount(uri.getQueryParameter("monto") ?: uri.getQueryParameter("total") ?: uri.getQueryParameter("m") ?: "")
+            val rawDate = uri.getQueryParameter("fecha") ?: uri.getQueryParameter("f") ?: ""
+            val formattedDate = normalizeDate(rawDate)
+
+            var subtotal = ""
+            var tax = "0.00"
+            val totalDouble = total.toDoubleOrNull() ?: 0.0
+            if (totalDouble > 0.0 && docType == "FACTURA") {
+                val subDouble = totalDouble / 1.18
+                subtotal = String.format(Locale.US, "%.2f", subDouble)
+                tax = String.format(Locale.US, "%.2f", totalDouble - subDouble)
+            } else if (totalDouble > 0.0) {
+                subtotal = String.format(Locale.US, "%.2f", totalDouble)
+            }
+
+            InvoiceOcrData(
+                supplierRuc = ruc,
+                supplierName = "",
+                documentType = docType,
+                series = series,
+                number = number,
+                issueDate = formattedDate,
+                subtotal = subtotal,
+                taxAmount = tax,
+                totalAmount = total,
+                rawText = rawString,
+                isAiExtracted = false
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun parseDashFormat(text: String, rawString: String): InvoiceOcrData? {
+        // Busca patrón: 20608300393-01-F001-000123...
+        val pattern = Pattern.compile("""\b((?:10|20)\d{9})-(0[1378]|R1)-([FEBT][A-Z0-9]{3})-(\d{1,8})-([0-9.]+)-(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4})\b""")
+        val matcher = pattern.matcher(text)
+        if (matcher.find()) {
+            val ruc = matcher.group(1) ?: ""
+            val docType = mapDocType(matcher.group(2) ?: "01")
+            val series = matcher.group(3)?.uppercase() ?: ""
+            val number = matcher.group(4) ?: ""
+            val total = cleanAmount(matcher.group(5) ?: "")
+            val formattedDate = normalizeDate(matcher.group(6) ?: "")
+
+            var subtotal = ""
+            var tax = "0.00"
+            val totalDouble = total.toDoubleOrNull() ?: 0.0
+            if (totalDouble > 0.0 && docType == "FACTURA") {
+                val subDouble = totalDouble / 1.18
+                subtotal = String.format(Locale.US, "%.2f", subDouble)
+                tax = String.format(Locale.US, "%.2f", totalDouble - subDouble)
+            } else if (totalDouble > 0.0) {
+                subtotal = String.format(Locale.US, "%.2f", totalDouble)
+            }
+
+            return InvoiceOcrData(
+                supplierRuc = ruc,
+                supplierName = "",
+                documentType = docType,
+                series = series,
+                number = number,
+                issueDate = formattedDate,
+                subtotal = subtotal,
+                taxAmount = tax,
+                totalAmount = total,
+                rawText = rawString,
+                isAiExtracted = false
+            )
+        }
+        return null
     }
 
     private fun mapDocType(code: String): String {

@@ -147,7 +147,14 @@ class ExpenseInvoicesViewModel @Inject constructor(
                     if (previewBitmap != null) {
                         SunatQrParser.scanAndParseQrFromBitmap(previewBitmap)
                     } else {
-                        SunatQrParser.scanAndParseQr(context, previewUri)
+                        // Intentar primero sobre la imagen original de la cámara a máxima resolución
+                        val rawScan = SunatQrParser.scanAndParseQr(context, documentUri)
+                        if (rawScan != null && rawScan.supplierRuc.isNotBlank()) {
+                            rawScan
+                        } else {
+                            // Si no se detectó, intentar sobre la imagen procesada con realce de contraste
+                            SunatQrParser.scanAndParseQr(context, previewUri)
+                        }
                     }
                 }
 
