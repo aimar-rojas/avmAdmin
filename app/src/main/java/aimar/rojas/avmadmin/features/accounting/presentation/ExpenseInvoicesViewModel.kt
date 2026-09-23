@@ -225,15 +225,15 @@ class ExpenseInvoicesViewModel @Inject constructor(
                     it.copy(
                         isOcrProcessing = false,
                         processingStage = InvoiceProcessingStage.COMPLETED,
-                        supplierRuc = it.supplierRuc.orDash(),
-                        supplierName = it.supplierName.orDash(),
-                        series = it.series.orDash(),
-                        number = it.number.orDash(),
+                        supplierRuc = it.supplierRuc.trim(),
+                        supplierName = it.supplierName.trim(),
+                        series = it.series.trim(),
+                        number = it.number.trim(),
                         issueDate = it.issueDate.ifBlank { currentDateInPeruvianFormat() },
                         subtotal = it.subtotal.ifBlank { "0.00" },
                         taxAmount = it.taxAmount.ifBlank { "0.00" },
                         category = it.category.ifBlank { "OTROS" },
-                        description = it.description.orDash(),
+                        description = it.description.trim(),
                         errorMessage = "No se pudo leer el comprobante automáticamente. Puedes ingresar los datos manualmente."
                     )
                 }
@@ -429,17 +429,17 @@ class ExpenseInvoicesViewModel @Inject constructor(
                 isOcrProcessing = false,
                 processingStage = InvoiceProcessingStage.COMPLETED,
                 extractionSource = source,
-                supplierRuc = ocrData.supplierRuc.orDash(),
-                supplierName = ocrData.supplierName.orDash(),
+                supplierRuc = ocrData.supplierRuc.trim(),
+                supplierName = ocrData.supplierName.trim(),
                 documentType = ocrData.documentType.ifBlank { "FACTURA" },
-                series = ocrData.series.orDash(),
-                number = ocrData.number.orDash(),
+                series = ocrData.series.trim(),
+                number = ocrData.number.trim(),
                 issueDate = ocrData.issueDate.ifBlank { currentDateInPeruvianFormat() },
                 subtotal = ocrData.subtotal.ifBlank { "0.00" },
                 taxAmount = ocrData.taxAmount.ifBlank { "0.00" },
-                totalAmount = ocrData.totalAmount,
+                totalAmount = ocrData.totalAmount.trim(),
                 category = ocrData.category.normalizedCategory(),
-                description = ocrData.description.orDash()
+                description = ocrData.description.trim()
             )
         }
     }
